@@ -1,10 +1,11 @@
 # Gideon's Bücherwelt – Design-Spezifikation (verbindlich für die Umsetzung)
 
-Diese Spezifikation ist die designgebende Quelle für die Android-App (Jetpack Compose).
-Die sechs Bildschirm-Mockups liegen als HTML in `design/mockups/` und können 1:1 in ein
-Pixso-Projekt übernommen werden (z. B. per „HTML/Paste as design" bzw. `code_to_design`).
-Die Compose-Umsetzung folgt exakt diesen Tokens (`ui/theme/Color.kt`, `Theme.kt`,
-`ui/components/*`).
+Designgebende Quelle ist das **Google-Stitch-Projekt** „Gideon's Bücherwelt – Android App
+(Bibliothek, Tropes, Empfehlungen)" (`projects/2017226052745578868`) mit dem Design-System
+`assets/3041670234388923945` – Details und Screen-IDs siehe `design/stitch/SCREENS.md`.
+Diese Spezifikation hier beschreibt die verbindlichen Tokens; die sechs Bildschirm-Mockups
+liegen als statische HTML-Referenz in `design/mockups/`. Die Compose-Umsetzung folgt exakt
+diesen Tokens (`ui/theme/Color.kt`, `Theme.kt`, `ui/components/*`).
 
 ## 1. Farbschema
 

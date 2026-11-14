@@ -63,12 +63,16 @@ gradle wrapper            # oder in Android Studio: Rechtsklick gradle-wrapper.p
 App auf dem Smartphone installieren (`app-debug.apk`) und starten.
 Berechtigungen: Kamera (nur für den ISBN-Scan), Internet (nur für API-Abfragen).
 
-## Design
+## Design (Google Stitch)
 
-Die GUI folgt der Spezifikation in [design/DESIGN.md](design/DESIGN.md). Die Mockups in
-[design/mockups/](design/mockups/) (Bibliothek, Buchdetail, Erfassung/Scan, Entdecken,
-Statistik, Einstellungen) können direkt in Pixso übernommen werden; die Compose-Umsetzung
-implementiert dieselben Tokens (Farben siehe `ui/theme/Color.kt`).
+Die GUI ist im Google-Stitch-Projekt **„Gideon's Bücherwelt – Android App (Bibliothek, Tropes,
+Empfehlungen)"** (`projects/2017226052745578868`) entworfen – inkl. Design-System
+(`assets/3041670234388923945`, warmes Bibliotheks-Theme mit Light+Dark) und allen sechs
+Hauptbildschirmen (Bibliothek, Buchdetail, Buch erfassen/Scan, Entdecken, Statistiken,
+Einstellungen; Screen-IDs siehe [design/stitch/SCREENS.md](design/stitch/SCREENS.md)).
+Die verbindliche Token-Spezifikation liegt in [design/DESIGN.md](design/DESIGN.md), statische
+Referenz-Mockups in [design/mockups/](design/mockups/). Die Compose-Umsetzung implementiert
+dieselben Tokens (Farben siehe `ui/theme/Color.kt`, Komponenten siehe `ui/components/`).
 
 ## Entwicklungs-Schritte (jeweils lauffähige Version, eigene Commits)
 
