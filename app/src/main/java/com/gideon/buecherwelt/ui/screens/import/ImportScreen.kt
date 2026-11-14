@@ -69,7 +69,7 @@ fun ImportScreen(
                 if (progress != null) {
                     Text("Import läuft: ${progress.done}/${progress.total} – ${progress.currentTitle}")
                     LinearProgressIndicator(
-                        progress = { progress.done.toFloat() / progress.total.coerceAtLeast(1) },
+                        progress = progress.done.toFloat() / progress.total.coerceAtLeast(1),
                         modifier = Modifier.fillMaxWidth()
                     )
                     Text("Importiert: ${progress.imported}, übersprungen: ${progress.skipped}")

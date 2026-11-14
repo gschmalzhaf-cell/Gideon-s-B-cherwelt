@@ -92,7 +92,7 @@ fun StatsScreen(container: AppContainer) {
                             Text("$count", style = MaterialTheme.typography.bodySmall)
                         }
                         LinearProgressIndicator(
-                            progress = { count.toFloat() / max },
+                            progress = count.toFloat() / max,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(8.dp)

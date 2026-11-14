@@ -8,12 +8,12 @@ plugins {
 
 android {
     namespace = "com.gideon.buecherwelt"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.gideon.buecherwelt"
         minSdk = 26
-        targetSdk = 35
+        targetSdk = 36
         versionCode = 1
         versionName = "1.0"
     }
@@ -80,6 +80,7 @@ dependencies {
     implementation(libs.serialization.json)
 
     implementation(libs.coil.compose)
+    implementation(libs.coil.network.okhttp)
 
     implementation(libs.camerax.core)
     implementation(libs.camerax.camera2)
