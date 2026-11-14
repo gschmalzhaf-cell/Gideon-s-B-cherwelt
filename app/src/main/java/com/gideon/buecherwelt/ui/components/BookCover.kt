@@ -10,14 +10,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.layout.ContentScale
 import coil.compose.AsyncImage
 import java.io.File
-
-@Composable
-fun bookCoverPlaceholder(): Painter =
-    androidx.compose.ui.res.painterResource(android.R.drawable.ic_menu_agenda)
 
 @Composable
 fun BookCover(
