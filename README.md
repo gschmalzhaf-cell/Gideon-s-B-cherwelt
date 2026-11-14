@@ -63,6 +63,13 @@ gradle wrapper            # oder in Android Studio: Rechtsklick gradle-wrapper.p
 App auf dem Smartphone installieren (`app-debug.apk`) und starten.
 Berechtigungen: Kamera (nur für den ISBN-Scan), Internet (nur für API-Abfragen).
 
+## Release
+
+Siehe [RELEASE.md](RELEASE.md): Keystore lokal erzeugen, 4 GitHub-Secrets setzen
+(`KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD`), dann `git tag v1.0.0 && git push origin v1.0.0` –
+der Workflow `.github/workflows/release.yml` baut signierte APK + AAB und legt ein GitHub-Release an.
+Bei jedem Push/PR baut `.github/workflows/build.yml` eine Debug-APK (CI-Compile-Check).
+
 ## Design (Google Stitch)
 
 Die GUI ist im Google-Stitch-Projekt **„Gideon's Bücherwelt – Android App (Bibliothek, Tropes,
