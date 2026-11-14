@@ -1,3 +1,14 @@
+# Gideon's Bücherwelt – v1.0.1 (Hotfix)
+
+Behebt einen Crash direkt beim App-Start.
+
+## Fixes
+- Absturz beim Start behoben (`IllegalArgumentException: long does not allow nullable values`): das optionale `editBookId`-Navigationsargument der „Buch erfassen/bearbeiten“-Route nutzte in Navigation 2.10.x nicht mehr erlaubte nullable `LongType`-Werte. Jetzt mit `defaultValue = -1L` als Sentinel, der intern wieder zu „neues Buch“ (`null`) gemappt wird.
+
+**Full Changelog**: https://github.com/gschmalzhaf-cell/Gideon-s-B-cherwelt/commits/v1.0.1
+
+---
+
 # Gideon's Bücherwelt – v1.0.0 (erster Release)
 
 Erste veröffentlichte Version der lokalen Bibliothek-App.
