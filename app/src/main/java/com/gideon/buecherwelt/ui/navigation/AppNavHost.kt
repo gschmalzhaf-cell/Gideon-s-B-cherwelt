@@ -1,6 +1,7 @@
 package com.gideon.buecherwelt.ui.navigation
 
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.Book
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
@@ -29,6 +30,7 @@ import com.gideon.buecherwelt.ui.screens.tropes.TropeManagerScreen
 import com.gideon.buecherwelt.ui.screens.library.LibraryScreen
 import com.gideon.buecherwelt.ui.screens.scanner.BarcodeScannerScreen
 import com.gideon.buecherwelt.ui.screens.settings.SettingsScreen
+import com.gideon.buecherwelt.ui.screens.stats.StatsScreen
 
 sealed class Screen(val route: String) {
     data object Library : Screen("library")
@@ -55,6 +57,7 @@ fun AppNavHost(
     val scannedIsbn = remember { mutableStateOf<String?>(null) }
     val mainRoutes = listOf(
         Screen.Library.route,
+        Screen.Stats.route,
         Screen.Settings.route
     )
     val backStackEntry by navController.currentBackStackEntryAsState()
@@ -81,6 +84,12 @@ fun AppNavHost(
                         label = { Text("Bibliothek") }
                     )
                     NavigationBarItem(
+                        selected = currentRoute == Screen.Stats.route,
+                        onClick = { navigateToMain(Screen.Stats.route) },
+                        icon = { Icon(Icons.Default.BarChart, contentDescription = null) },
+                        label = { Text("Statistik") }
+                    )
+                    NavigationBarItem(
                         selected = currentRoute == Screen.Settings.route,
                         onClick = { navigateToMain(Screen.Settings.route) },
                         icon = { Icon(Icons.Default.Settings, contentDescription = null) },
@@ -100,6 +109,9 @@ fun AppNavHost(
             }
             composable(Screen.Settings.route) {
                 SettingsScreen(container = container, navController = navController)
+            }
+            composable(Screen.Stats.route) {
+                StatsScreen(container = container)
             }
             composable(Screen.Tropes.route) {
                 TropeManagerScreen(container = container, navController = navController)
