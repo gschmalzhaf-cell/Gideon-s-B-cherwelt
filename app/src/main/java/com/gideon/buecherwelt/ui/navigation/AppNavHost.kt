@@ -146,11 +146,10 @@ fun AppNavHost(
                 route = Screen.AddBook.route,
                 arguments = listOf(navArgument("editBookId") {
                     type = NavType.LongType
-                    nullable = true
-                    defaultValue = null
+                    defaultValue = -1L
                 })
             ) { backStackEntry ->
-                val editBookId = backStackEntry.arguments?.getLong("editBookId")
+                val editBookId = backStackEntry.arguments?.getLong("editBookId")?.takeIf { it >= 0 }
                 AddBookScreen(
                     container = container,
                     navController = navController,
