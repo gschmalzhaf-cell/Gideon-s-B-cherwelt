@@ -99,7 +99,7 @@ fun BookDetailScreen(
                     }
                 }
             )
-        }
+        },
         snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { padding ->
         val current = book

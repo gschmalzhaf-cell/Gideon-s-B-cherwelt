@@ -90,7 +90,6 @@ fun BarcodeScannerScreen(
                                 analysis
                             )
                         } catch (e: Exception) {
-                            imageProxyCloseSafe(imageProxy)
                         }
                     }, ContextCompat.getMainExecutor(ctx))
                     previewView
@@ -150,9 +149,3 @@ private fun processFrame(imageProxy: ImageProxy, onResult: (String) -> Unit) {
         .addOnCompleteListener { imageProxy.close() }
 }
 
-private fun imageProxyCloseSafe(imageProxy: ImageProxy) {
-    try {
-        imageProxy.close()
-    } catch (_: Exception) {
-    }
-}

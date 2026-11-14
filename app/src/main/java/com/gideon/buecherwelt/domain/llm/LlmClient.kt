@@ -53,7 +53,7 @@ class LlmClient(
                     val root = json.parseToJsonElement(text).jsonObject
                     root["choices"]?.jsonArray?.firstOrNull()?.jsonObject
                         ?.get("message")?.jsonObject
-                        ?.get("content")?.jsonPrimitive?.contentOrNull
+                        ?.get("content")?.jsonPrimitive?.takeIf { it.isString }?.content
                 }
             } catch (e: Exception) {
                 null
