@@ -1,3 +1,15 @@
+# Gideon's Bücherwelt – v1.0.2
+
+Verbesserungen bei der Buch-Suche.
+
+## Neu
+- **Suche per ASIN und Goodreads-ID** zusätzlich zur ISBN: Im „Buch erfassen"-Feld (ISBN / ASIN / Goodreads-ID) werden ASINs im Format `B0…` über Open Library (`id_amazon`) aufgelöst und numerische Goodreads-IDs über `id_goodreads` – jeweils angereichert mit Metadaten/Cover von Google Books + Open Library
+- **ISBN-Suche toleriert Bindestriche und Leerzeichen** (beidseitig): `978-3-16-148410-0` und `9783161484100` finden dasselbe Buch – sowohl in der Bibliotheks-Suche als auch bei den API-Abfragen
+
+**Full Changelog**: https://github.com/gschmalzhaf-cell/Gideon-s-B-cherwelt/commits/v1.0.2
+
+---
+
 # Gideon's Bücherwelt – v1.0.1 (Hotfix)
 
 Behebt einen Crash direkt beim App-Start.
