@@ -166,7 +166,7 @@ fun AddBookScreen(
                 OutlinedTextField(
                     value = isbn,
                     onValueChange = { isbn = it },
-                    label = { Text("ISBN") },
+                    label = { Text("ISBN / ASIN / Goodreads-ID") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -190,7 +190,7 @@ fun AddBookScreen(
                     }
                 }
                 Text(
-                    text = "Ohne ISBN: Felder unten manuell ausfüllen und speichern.",
+                    text = "Ohne Kennung: Felder unten manuell ausfüllen und speichern.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

@@ -161,7 +161,7 @@ class AddBookViewModel(
                 is FetchResult.NotFound -> _state.update {
                     it.copy(
                         loading = false,
-                        error = "Zu dieser ISBN wurden keine Daten gefunden. Du kannst das Buch unten manuell anlegen."
+                        error = "Zu dieser Kennung wurden keine Daten gefunden. Du kannst das Buch unten manuell anlegen."
                     )
                 }
                 is FetchResult.NoNetwork -> _state.update {

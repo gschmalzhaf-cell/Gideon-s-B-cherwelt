@@ -134,7 +134,7 @@ fun SettingsScreen(
             SectionHeader("Daten", modifier = Modifier.padding(top = 0.dp))
             ListItem(
                 headlineContent = { Text("StoryGraph-CSV importieren") },
-                supportingContent = { Text("Titel, Autor:in, Status, eigene Tags; Buchdaten werden per ISBN nachgeladen.") },
+                supportingContent = { Text("Titel, Autor:in, Status, eigene Tags; Buchdaten werden per ISBN/ASIN/Goodreads-ID nachgeladen.") },
                 modifier = Modifier.fillMaxWidth()
             )
             OutlinedButton(
@@ -154,7 +154,7 @@ fun SettingsScreen(
 
             SectionHeader("Über")
             Text(
-                "Gideon's Bücherwelt – persönliche Bibliothek, 100 % lokal (Room-Datenbank). Netzwerk wird nur für ISBN-Abfragen, Cover-Downloads und optionale LLM-Aufrufe genutzt.",
+                "Gideon's Bücherwelt – persönliche Bibliothek, 100 % lokal (Room-Datenbank). Netzwerk wird nur für ISBN-/ASIN-/Goodreads-Abfragen, Cover-Downloads und optionale LLM-Aufrufe genutzt.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

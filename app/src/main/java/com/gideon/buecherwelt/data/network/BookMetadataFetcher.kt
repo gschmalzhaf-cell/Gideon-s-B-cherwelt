@@ -8,43 +8,76 @@ class BookMetadataFetcher(
     private val openLibraryApi: OpenLibraryApi
 ) {
 
-    suspend fun fetchByIsbn(rawIsbn: String): FetchResult {
-        val isbn = normalizeIsbn(rawIsbn)
-            ?: return FetchResult.Error("Ungültige ISBN – 10 oder 13 Zeichen (Ziffern, ggf. X).")
+    suspend fun fetchByIdentifier(raw: String): FetchResult {
+        val candidates = classifyIdentifier(raw)
+        if (candidates.isEmpty()) {
+            return FetchResult.Error(
+                "Ungültige Eingabe – erwartet ISBN (10/13 Zeichen), ASIN (z. B. B0…) oder Goodreads-ID (Zahl)."
+            )
+        }
         return try {
-            val gb = callApi { googleBooksApi.searchByIsbn("isbn:$isbn").items.firstOrNull()?.volumeInfo }
-            val ol = callApi { openLibraryApi.getByIsbn(isbn) }
-            val olAuthors = ol?.authors.orEmpty().mapNotNull { ref ->
-                ref.key?.substringAfterLast('/')?.let { key ->
-                    callApi { openLibraryApi.getAuthor(key)?.name }
+            for ((kind, value) in candidates) {
+                val metadata = when (kind) {
+                    IdentifierKind.ISBN -> fetchIsbnMetadata(value)
+                    IdentifierKind.ASIN -> olSearchFirst("id_amazon:$value")?.toMetadata()?.enrichByIsbn()
+                    IdentifierKind.GOODREADS -> olSearchFirst("id_goodreads:$value")?.toMetadata()?.enrichByIsbn()
                 }
+                if (metadata != null && metadata.title.isNotBlank()) return FetchResult.Success(metadata)
             }
-            val metadata = merge(isbn = isbn, gb = gb, ol = ol, olAuthors = olAuthors)
-            if (metadata.title.isBlank()) FetchResult.NotFound else FetchResult.Success(metadata)
+            FetchResult.NotFound
         } catch (e: NoNetworkException) {
             FetchResult.NoNetwork
         } catch (e: Exception) {
-            FetchResult.Error(e.message ?: "Unbekannter Fehler bei der ISBN-Abfrage.")
+            FetchResult.Error(e.message ?: "Unbekannter Fehler bei der Abfrage.")
         }
     }
 
-    suspend fun search(query: String, maxResults: Int = 20): List<BookMetadata> = try {
-        val isbn = normalizeIsbn(query)
-        val effectiveQuery = if (isbn != null) "isbn:$isbn" else query
-        val gb = callApi { googleBooksApi.search(effectiveQuery, maxResults) }?.items.orEmpty()
-        val ol = callApi { openLibraryApi.search(effectiveQuery, maxResults) }?.docs.orEmpty()
-        val fromGb = gb.mapNotNull { it.volumeInfo?.let { v -> toMetadata(null, v) } }
-        val fromOl = ol.map { d ->
-            BookMetadata(
-                isbn = d.isbn?.firstOrNull { it.length == 13 } ?: d.isbn?.firstOrNull(),
-                title = d.title ?: "",
-                author = d.authorName?.joinToString(", ").orEmpty(),
-                publisher = d.publisher?.firstOrNull().orEmpty(),
-                publishedYear = d.firstPublishYear,
-                categories = d.subjects?.take(5).orEmpty(),
-                coverUrl = d.coverId?.let { "https://covers.openlibrary.org/b/id/$it-M.jpg" }
-            )
+    suspend fun fetchByIsbn(rawIsbn: String): FetchResult = fetchByIdentifier(rawIsbn)
+
+    private suspend fun fetchIsbnMetadata(isbn: String): BookMetadata? {
+        val gb = callApi { googleBooksApi.searchByIsbn("isbn:$isbn").items.firstOrNull()?.volumeInfo }
+        val ol = callApi { openLibraryApi.getByIsbn(isbn) }
+        val olAuthors = ol?.authors.orEmpty().mapNotNull { ref ->
+            ref.key?.substringAfterLast('/')?.let { key ->
+                callApi { openLibraryApi.getAuthor(key)?.name }
+            }
         }
+        return merge(isbn = isbn, gb = gb, ol = ol, olAuthors = olAuthors)
+    }
+
+    private suspend fun olSearchFirst(query: String): OlDoc? =
+        callApi { openLibraryApi.search(query, 5) }?.docs?.firstOrNull()
+
+    private suspend fun BookMetadata.enrichByIsbn(): BookMetadata =
+        isbn?.let { fetchIsbnMetadata(it) } ?: this
+
+    private fun OlDoc.toMetadata(): BookMetadata = BookMetadata(
+        isbn = isbn?.firstOrNull { it.length == 13 } ?: isbn?.firstOrNull(),
+        title = title ?: "",
+        author = authorName?.joinToString(", ").orEmpty(),
+        publisher = publisher?.firstOrNull().orEmpty(),
+        publishedYear = firstPublishYear,
+        categories = subjects?.take(5).orEmpty(),
+        coverUrl = coverId?.let { "https://covers.openlibrary.org/b/id/$it-M.jpg" }
+    )
+
+    suspend fun search(query: String, maxResults: Int = 20): List<BookMetadata> = try {
+        val candidates = classifyIdentifier(query)
+        val gbQuery = candidates.firstOrNull { it.first == IdentifierKind.ISBN }
+            ?.let { "isbn:${it.second}" } ?: query
+        val olQuery = when {
+            candidates.any { it.first == IdentifierKind.ISBN } ->
+                "isbn:" + candidates.first { it.first == IdentifierKind.ISBN }.second
+            candidates.any { it.first == IdentifierKind.ASIN } ->
+                "id_amazon:" + candidates.first { it.first == IdentifierKind.ASIN }.second
+            candidates.any { it.first == IdentifierKind.GOODREADS } ->
+                "id_goodreads:" + candidates.first { it.first == IdentifierKind.GOODREADS }.second
+            else -> query
+        }
+        val gb = callApi { googleBooksApi.search(gbQuery, maxResults) }?.items.orEmpty()
+        val ol = callApi { openLibraryApi.search(olQuery, maxResults) }?.docs.orEmpty()
+        val fromGb = gb.mapNotNull { it.volumeInfo?.let { v -> toMetadata(null, v) } }
+        val fromOl = ol.map { it.toMetadata() }
         (fromGb + fromOl)
     } catch (e: NoNetworkException) {
         emptyList()
@@ -122,6 +155,21 @@ class BookMetadataFetcher(
     }
 
     companion object {
+        enum class IdentifierKind { ISBN, ASIN, GOODREADS }
+
+        fun classifyIdentifier(raw: String): List<Pair<IdentifierKind, String>> {
+            val cleaned = raw.trim().uppercase().filter { it.isLetterOrDigit() }
+            val result = mutableListOf<Pair<IdentifierKind, String>>()
+            normalizeIsbn(raw)?.let { result += IdentifierKind.ISBN to it }
+            if (cleaned.length == 10 && cleaned[0] == 'B') {
+                result += IdentifierKind.ASIN to cleaned
+            }
+            if (cleaned.all { it.isDigit() } && cleaned.length in 5..12) {
+                result += IdentifierKind.GOODREADS to cleaned
+            }
+            return result
+        }
+
         fun normalizeIsbn(raw: String): String? {
             val cleaned = raw.trim().uppercase().filter { it.isDigit() || it == 'X' }
             if (cleaned.length != 10 && cleaned.length != 13) return null

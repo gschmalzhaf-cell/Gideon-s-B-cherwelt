@@ -300,7 +300,7 @@ private fun WishlistCard(
                 }
             }
             IconButton(onClick = onAdd) {
-                Icon(Icons.Default.Add, contentDescription = "Per ISBN zur Bibliothek hinzufügen")
+                Icon(Icons.Default.Add, contentDescription = "Per ISBN/ASIN zur Bibliothek hinzufügen")
             }
             IconButton(onClick = onRemove) {
                 Icon(Icons.Default.BookmarkRemove, contentDescription = "Von Merkliste entfernen")
