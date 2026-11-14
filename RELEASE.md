@@ -31,6 +31,9 @@ git push origin v1.0.0
 Der Workflow baut `app-release.apk` (Sideload/ direkt installierbar) und `app-release.aab`
 (Google Play) und hängt beide an ein GitHub-Release.
 
+**Release Notes:** Vor jedem Tag `RELEASE_NOTES.md` im Repo aktualisieren – der Workflow
+hängt diese Datei per `body-path` als Release-Beschreibung an.
+
 ## Lokal signiert bauen (ohne CI)
 ```bash
 export KEYSTORE_PATH=~/buecherwelt-release.jks
