@@ -39,7 +39,7 @@ jobs:
 
       - name: Signierte APK + AAB bauen
         env:
-          KEYSTORE_PATH: app/release-keystore.jks
+          KEYSTORE_PATH: ${{ github.workspace }}/app/release-keystore.jks
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}

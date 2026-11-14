@@ -23,7 +23,7 @@ android {
         val keystorePath = System.getenv("KEYSTORE_PATH")
         if (keystorePath != null) {
             create("release") {
-                storeFile = file(keystorePath)
+                storeFile = file(keystorePath).let { if (it.exists()) it else rootProject.file(keystorePath) }
                 storePassword = System.getenv("KEYSTORE_PASSWORD")
                 keyAlias = System.getenv("KEY_ALIAS")
                 keyPassword = System.getenv("KEY_PASSWORD")
