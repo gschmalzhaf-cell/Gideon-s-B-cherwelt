@@ -24,6 +24,8 @@ import androidx.navigation.navArgument
 import com.gideon.buecherwelt.di.AppContainer
 import com.gideon.buecherwelt.ui.screens.add.AddBookScreen
 import com.gideon.buecherwelt.ui.screens.detail.BookDetailScreen
+import com.gideon.buecherwelt.ui.screens.import.ImportScreen
+import com.gideon.buecherwelt.ui.screens.tropes.TropeManagerScreen
 import com.gideon.buecherwelt.ui.screens.library.LibraryScreen
 import com.gideon.buecherwelt.ui.screens.scanner.BarcodeScannerScreen
 import com.gideon.buecherwelt.ui.screens.settings.SettingsScreen
@@ -98,6 +100,12 @@ fun AppNavHost(
             }
             composable(Screen.Settings.route) {
                 SettingsScreen(container = container, navController = navController)
+            }
+            composable(Screen.Tropes.route) {
+                TropeManagerScreen(container = container, navController = navController)
+            }
+            composable(Screen.Import.route) {
+                ImportScreen(container = container, navController = navController)
             }
             composable(
                 route = Screen.BookDetail.route,

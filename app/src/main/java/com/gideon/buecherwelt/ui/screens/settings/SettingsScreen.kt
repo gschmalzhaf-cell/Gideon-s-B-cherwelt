@@ -9,6 +9,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -130,7 +131,28 @@ fun SettingsScreen(
 
             HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp))
 
-            SectionHeader("Über", modifier = Modifier.padding(top = 0.dp))
+            SectionHeader("Daten", modifier = Modifier.padding(top = 0.dp))
+            ListItem(
+                headlineContent = { Text("StoryGraph-CSV importieren") },
+                supportingContent = { Text("Titel, Autor:in, Status, eigene Tags; Buchdaten werden per ISBN nachgeladen.") },
+                modifier = Modifier.fillMaxWidth()
+            )
+            OutlinedButton(
+                onClick = { navController.navigate(Screen.Import.route) },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("CSV-Datei auswählen")
+            }
+
+            SectionHeader("Tropes-Katalog")
+            OutlinedButton(
+                onClick = { navController.navigate(Screen.Tropes.route) },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Tropes verwalten")
+            }
+
+            SectionHeader("Über")
             Text(
                 "Gideon's Bücherwelt – persönliche Bibliothek, 100 % lokal (Room-Datenbank). Netzwerk wird nur für ISBN-Abfragen, Cover-Downloads und optionale LLM-Aufrufe genutzt.",
                 style = MaterialTheme.typography.bodySmall,
