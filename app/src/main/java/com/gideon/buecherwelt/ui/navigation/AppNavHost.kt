@@ -3,6 +3,7 @@ package com.gideon.buecherwelt.ui.navigation
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.Book
+import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
@@ -25,6 +26,7 @@ import androidx.navigation.navArgument
 import com.gideon.buecherwelt.di.AppContainer
 import com.gideon.buecherwelt.ui.screens.add.AddBookScreen
 import com.gideon.buecherwelt.ui.screens.detail.BookDetailScreen
+import com.gideon.buecherwelt.ui.screens.discover.DiscoverScreen
 import com.gideon.buecherwelt.ui.screens.import.ImportScreen
 import com.gideon.buecherwelt.ui.screens.tropes.TropeManagerScreen
 import com.gideon.buecherwelt.ui.screens.library.LibraryScreen
@@ -57,6 +59,7 @@ fun AppNavHost(
     val scannedIsbn = remember { mutableStateOf<String?>(null) }
     val mainRoutes = listOf(
         Screen.Library.route,
+        Screen.Discover.route,
         Screen.Stats.route,
         Screen.Settings.route
     )
@@ -84,6 +87,12 @@ fun AppNavHost(
                         label = { Text("Bibliothek") }
                     )
                     NavigationBarItem(
+                        selected = currentRoute == Screen.Discover.route,
+                        onClick = { navigateToMain(Screen.Discover.route) },
+                        icon = { Icon(Icons.Default.Explore, contentDescription = null) },
+                        label = { Text("Entdecken") }
+                    )
+                    NavigationBarItem(
                         selected = currentRoute == Screen.Stats.route,
                         onClick = { navigateToMain(Screen.Stats.route) },
                         icon = { Icon(Icons.Default.BarChart, contentDescription = null) },
@@ -109,6 +118,9 @@ fun AppNavHost(
             }
             composable(Screen.Settings.route) {
                 SettingsScreen(container = container, navController = navController)
+            }
+            composable(Screen.Discover.route) {
+                DiscoverScreen(container = container, navController = navController)
             }
             composable(Screen.Stats.route) {
                 StatsScreen(container = container)
