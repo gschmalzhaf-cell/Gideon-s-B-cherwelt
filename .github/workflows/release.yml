@@ -51,4 +51,4 @@ jobs:
           files: |
             app/build/outputs/apk/release/app-release.apk
             app/build/outputs/bundle/release/app-release.aab
-          body-path: RELEASE_NOTES.md
+          body_path: RELEASE_NOTES.md
