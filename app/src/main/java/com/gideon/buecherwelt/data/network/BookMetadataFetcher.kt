@@ -29,8 +29,10 @@ class BookMetadataFetcher(
     }
 
     suspend fun search(query: String, maxResults: Int = 20): List<BookMetadata> = try {
-        val gb = callApi { googleBooksApi.search(query, maxResults) }?.items.orEmpty()
-        val ol = callApi { openLibraryApi.search(query, maxResults) }?.docs.orEmpty()
+        val isbn = normalizeIsbn(query)
+        val effectiveQuery = if (isbn != null) "isbn:$isbn" else query
+        val gb = callApi { googleBooksApi.search(effectiveQuery, maxResults) }?.items.orEmpty()
+        val ol = callApi { openLibraryApi.search(effectiveQuery, maxResults) }?.docs.orEmpty()
         val fromGb = gb.mapNotNull { it.volumeInfo?.let { v -> toMetadata(null, v) } }
         val fromOl = ol.map { d ->
             BookMetadata(

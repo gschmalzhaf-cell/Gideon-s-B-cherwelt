@@ -29,7 +29,7 @@ data class LibraryUiState(
             (query.isBlank() ||
                 book.title.contains(query, ignoreCase = true) ||
                 book.author.contains(query, ignoreCase = true) ||
-                (book.isbn ?: "").contains(query)) &&
+                isbnComparable(book.isbn ?: "").contains(isbnComparable(query))) &&
                 (genre == null || book.genre == genre) &&
                 (status == null || book.status == status) &&
                 (minRating == 0 || (book.rating ?: 0) >= minRating) &&
@@ -75,3 +75,6 @@ class LibraryViewModel(
     fun setMinRating(rating: Int) = _state.update { it.copy(minRating = rating) }
     fun setTrope(trope: String?) = _state.update { it.copy(trope = trope) }
 }
+
+private fun isbnComparable(s: String): String =
+    s.uppercase().filter { it != '-' && !it.isWhitespace() }
