@@ -12,19 +12,24 @@ jobs:
   release:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "17"
 
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@v6
         with:
-          gradle-version: 8.14.7
+          gradle-version: 9.9.1
 
       - name: Gradle-Wrapper erzeugen
-        run: gradle wrapper --gradle-version 8.14.7 --distribution-type bin
+        run: gradle wrapper --gradle-version 9.9.1 --distribution-type bin
+
+      - name: Android SDK 37 sicherstellen
+        run: |
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null 2>&1 || true
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-37" "build-tools;37.0.0" || true
 
       - name: Keystore dekodieren
         env:
@@ -41,7 +46,7 @@ jobs:
         run: ./gradlew :app:assembleRelease :app:bundleRelease --no-daemon
 
       - name: GitHub Release anlegen
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: |
             app/build/outputs/apk/release/app-release.apk
