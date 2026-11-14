@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<style>
+  :root{--primary:#7A4E2D;--onPrimary:#fff;--primaryContainer:#F1DEC9;--secondaryContainer:#E2E8C8;--tertiaryContainer:#F6E7C1;
+    --bg:#FAF5EF;--surface:#FFFBF6;--surfaceVariant:#EDE0D2;--onSurface:#211A14;--onSurfaceVariant:#51453A;--star:#C89B3C;--spice:#E25822}
+  *{box-sizing:border-box;font-family:Roboto,system-ui,sans-serif;margin:0}
+  body{background:#e8e0d5;display:flex;justify-content:center;padding:24px}
+  .phone{width:412px;height:915px;background:var(--bg);border-radius:36px;overflow:hidden;box-shadow:0 12px 40px rgba(0,0,0,.35);
+    display:flex;flex-direction:column;color:var(--onSurface)}
+  .topbar{background:var(--surface);padding:18px 16px 10px;display:flex;justify-content:space-between;align-items:center;box-shadow:0 1px 0 rgba(0,0,0,.06)}
+  .topbar h1{font-size:20px;font-weight:600;max-width:260px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .content{flex:1;padding:16px;overflow:hidden}
+  .head{display:flex;gap:16px}
+  .cover{width:120px;aspect-ratio:2/3;border-radius:8px;background:linear-gradient(160deg,#8d5a33,#5f3d22);color:#F1DEC9;display:flex;align-items:center;justify-content:center;font-size:40px}
+  .headinfo h2{font-size:20px}
+  .headinfo .author{color:var(--onSurfaceVariant);font-size:14px;margin-top:2px}
+  .chip{display:inline-block;font-size:11px;padding:3px 10px;border-radius:8px;background:var(--primaryContainer);margin-top:8px}
+  .stars{color:var(--star);font-size:18px;margin-top:8px;letter-spacing:2px}
+  .spice{display:flex;align-items:center;gap:4px;margin-top:8px;font-size:13px}
+  h3{font-size:16px;font-weight:600;margin:18px 0 8px}
+  .row{display:flex;font-size:13px;padding:2px 0}
+  .row .k{color:var(--onSurfaceVariant);flex:1}
+  .row .v{flex:2;text-align:right}
+  .tchips{display:flex;flex-wrap:wrap;gap:6px}
+  .tchip{background:var(--primaryContainer);border-radius:16px;padding:5px 12px;font-size:12px}
+  .desc{font-size:13px;line-height:1.5}
+  .btn{border:1px solid var(--primary);color:var(--primary);border-radius:20px;padding:8px 16px;font-size:13px;background:transparent}
+  .sim{display:flex;gap:12px;background:var(--surface);border-radius:16px;padding:12px;margin-top:8px;align-items:flex-start;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+  .sim .cover{width:48px;font-size:20px;border-radius:4px}
+  .sim .t{font-size:13px;font-weight:600}
+  .sim .a{font-size:11px;color:var(--onSurfaceVariant)}
+  .sim .r{font-size:11px;color:var(--primary)}
+</style>
+</head>
+<body>
+<div class="phone">
+  <div class="topbar"><h1>Fourth Wing</h1><span style="font-size:20px">✏️ 🗑️</span></div>
+  <div class="content">
+    <div class="head">
+      <div class="cover">📖</div>
+      <div class="headinfo">
+        <h2>Fourth Wing</h2>
+        <div class="author">Rebecca Yarros</div>
+        <span class="chip">Lesend</span>
+        <div class="stars">★★★★★</div>
+        <div class="spice">Spice: <span style="color:var(--spice)">🔥🔥🔥🔥</span> 4/5</div>
+      </div>
+    </div>
+    <h3>Details</h3>
+    <div class="row"><span class="k">ISBN</span><span class="v">9783736223347</span></div>
+    <div class="row"><span class="k">Verlag</span><span class="v">dtv</span></div>
+    <div class="row"><span class="k">Erscheinungsjahr</span><span class="v">2023</span></div>
+    <div class="row"><span class="k">Genre</span><span class="v">Fantasy</span></div>
+    <div class="row"><span class="k">Subgenre</span><span class="v">Romantasy</span></div>
+    <h3>Tropes / Tags</h3>
+    <div class="tchips"><span class="tchip">Enemies to Lovers</span><span class="tchip">Forced Proximity</span><span class="tchip">Dragons</span><span class="tchip">Magic School</span></div>
+    <h3>Beschreibung</h3>
+    <p class="desc">Zwanzigjährige Violet will Bibliothekarin werden, doch ihre Mutter zwingt sie in die brutale Drachenreiter-Akademie…</p>
+    <h3>Meine Notizen</h3>
+    <p class="desc">Spannend, aber sehr lang. Kapitel 40–45 waren der Hammer.</p>
+    <h3>Ähnliche Bücher</h3>
+    <button class="btn">⟳ Ähnliche Bücher laden</button>
+    <div class="sim"><div class="cover">📖</div><div><div class="t">Iron Flame</div><div class="a">Rebecca Yarros</div><div class="r">• Gleiche Autor:in</div><div class="r">• Genre: Fantasy</div></div><span style="margin-left:auto;font-size:20px">＋</span></div>
+    <div class="sim"><div class="cover">📖</div><div><div class="t">ACOTAR</div><div class="a">Sarah J. Maas</div><div class="r">• Ähnliche Tropes/Themen</div></div><span style="margin-left:auto;font-size:20px">＋</span></div>
+  </div>
+</div>
+</body>
+</html>

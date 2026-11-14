@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<style>
+  :root{--primary:#7A4E2D;--primaryContainer:#F1DEC9;--bg:#FAF5EF;--surface:#FFFBF6;--surfaceVariant:#EDE0D2;--onSurface:#211A14;--onSurfaceVariant:#51453A;--spice:#E25822}
+  *{box-sizing:border-box;font-family:Roboto,system-ui,sans-serif;margin:0}
+  body{background:#e8e0d5;display:flex;justify-content:center;padding:24px}
+  .phone{width:412px;height:915px;background:var(--bg);border-radius:36px;overflow:hidden;box-shadow:0 12px 40px rgba(0,0,0,.35);display:flex;flex-direction:column;color:var(--onSurface)}
+  .topbar{background:var(--surface);padding:18px 16px 10px;box-shadow:0 1px 0 rgba(0,0,0,.06)}
+  .topbar h1{font-size:22px;font-weight:600}
+  .content{flex:1;padding:16px;overflow:hidden}
+  .card{background:var(--surface);border-radius:16px;padding:16px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+  h3{font-size:16px;font-weight:600;margin:4px 0 8px}
+  .row{display:flex;justify-content:space-between;font-size:13px;padding:2px 0}
+  .tchips{display:flex;flex-wrap:wrap;gap:6px}
+  .tchip{background:var(--primaryContainer);border-radius:16px;padding:5px 12px;font-size:12px}
+  .bar-row{margin:6px 0}
+  .bar-label{display:flex;justify-content:space-between;font-size:12px}
+  .bar{height:8px;border-radius:4px;background:var(--surfaceVariant);margin-top:3px;overflow:hidden}
+  .bar i{display:block;height:100%;background:var(--primary);border-radius:4px}
+  .bottombar{background:var(--surface);display:flex;justify-content:space-around;padding:10px 0 18px;box-shadow:0 -1px 0 rgba(0,0,0,.06)}
+  .nav{display:flex;flex-direction:column;align-items:center;font-size:11px;color:var(--onSurfaceVariant);gap:2px}
+  .nav.active{color:var(--primary);font-weight:600} .nav .ic{font-size:22px}
+</style>
+</head>
+<body>
+<div class="phone">
+  <div class="topbar"><h1>Meine Lesevorlieben</h1></div>
+  <div class="content">
+    <div class="card"><h3>Bibliothek</h3>
+      <div class="row"><span>Geplant</span><span>8</span></div>
+      <div class="row"><span>Lesend</span><span>3</span></div>
+      <div class="row"><span>Gelesen</span><span>12</span></div>
+      <div class="row"><span>Abgebrochen</span><span>1</span></div>
+      <div class="row" style="font-weight:600"><span>Gesamt</span><span>24</span></div>
+    </div>
+    <div class="card"><h3>Top-Genres</h3>
+      <div class="tchips"><span class="tchip">Fantasy</span><span class="tchip">Romance</span><span class="tchip">Sci-Fi</span><span class="tchip">Thriller</span></div>
+    </div>
+    <div class="card"><h3>Genre-Verteilung</h3>
+      <div class="bar-row"><div class="bar-label"><span>Fantasy</span><span>12</span></div><div class="bar"><i style="width:100%"></i></div></div>
+      <div class="bar-row"><div class="bar-label"><span>Romance</span><span>6</span></div><div class="bar"><i style="width:50%"></i></div></div>
+      <div class="bar-row"><div class="bar-label"><span>Sci-Fi</span><span>4</span></div><div class="bar"><i style="width:33%"></i></div></div>
+      <div class="bar-row"><div class="bar-label"><span>Thriller</span><span>2</span></div><div class="bar"><i style="width:17%"></i></div></div>
+    </div>
+    <div class="card"><h3>Top-Tropes</h3>
+      <div class="tchips"><span class="tchip">Enemies to Lovers</span><span class="tchip">Forced Proximity</span><span class="tchip">Dragons</span><span class="tchip">Found Family</span><span class="tchip">Slow Burn</span></div>
+    </div>
+    <div class="card"><h3>Lieblingsautor:innen & Verlage</h3>
+      <div class="tchips"><span class="tchip">Rebecca Yarros</span><span class="tchip">Sarah J. Maas</span><span class="tchip">Andy Weir</span><span class="tchip">dtv</span></div>
+    </div>
+    <div class="card"><h3>Spice-Level im Schnitt</h3>
+      <div style="font-size:15px">3.4 / 5&nbsp;&nbsp;<span style="color:var(--spice)">🔥🔥🔥</span></div>
+    </div>
+    <div class="card"><h3>Lieblingsbücher (gelesen, 4–5 Sterne)</h3>
+      <div class="row"><span>• Fourth Wing – Rebecca Yarros (5/5)</span></div>
+      <div class="row"><span>• Projekt Hail Mary – Andy Weir (5/5)</span></div>
+    </div>
+  </div>
+  <div class="bottombar">
+    <div class="nav"><span class="ic">📚</span>Bibliothek</div>
+    <div class="nav"><span class="ic">🧭</span>Entdecken</div>
+    <div class="nav active"><span class="ic">📊</span>Statistik</div>
+    <div class="nav"><span class="ic">⚙️</span>Einstellungen</div>
+  </div>
+</div>
+</body>
+</html>

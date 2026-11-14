@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<style>
+  :root{--primary:#7A4E2D;--onPrimary:#fff;--primaryContainer:#F1DEC9;--bg:#FAF5EF;--surface:#FFFBF6;--surfaceVariant:#EDE0D2;--onSurface:#211A14;--onSurfaceVariant:#51453A;--star:#C89B3C}
+  *{box-sizing:border-box;font-family:Roboto,system-ui,sans-serif;margin:0}
+  body{background:#e8e0d5;display:flex;justify-content:center;padding:24px}
+  .phone{width:412px;height:915px;background:var(--bg);border-radius:36px;overflow:hidden;box-shadow:0 12px 40px rgba(0,0,0,.35);display:flex;flex-direction:column;color:var(--onSurface)}
+  .topbar{background:var(--surface);padding:18px 16px 10px;box-shadow:0 1px 0 rgba(0,0,0,.06)}
+  .topbar h1{font-size:20px;font-weight:600}
+  .content{flex:1;padding:16px;overflow:hidden}
+  .field{width:100%;padding:10px 12px;border:1px solid var(--surfaceVariant);border-radius:12px;background:var(--surface);font-size:14px;margin-bottom:10px;color:var(--onSurface)}
+  label{font-size:11px;color:var(--onSurfaceVariant);display:block;margin:10px 0 4px}
+  .btnrow{display:flex;gap:8px}
+  .btn{background:var(--primary);color:var(--onPrimary);border:none;border-radius:20px;padding:10px 16px;font-size:13px}
+  .obtn{background:transparent;border:1px solid var(--primary);color:var(--primary);border-radius:20px;padding:10px 16px;font-size:13px}
+  .hint{font-size:11px;color:var(--onSurfaceVariant)}
+  .coverprev{display:flex;gap:12px;align-items:center;background:var(--surface);border-radius:16px;padding:10px;margin:10px 0}
+  .cover{width:64px;aspect-ratio:2/3;border-radius:6px;background:linear-gradient(160deg,#5D6B3F,#414A28)}
+  .sugg{background:var(--surface);border-radius:12px;padding:12px;margin:10px 0}
+  .tchips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+  .tchip{border:1px solid var(--surfaceVariant);border-radius:16px;padding:5px 12px;font-size:12px;background:var(--surface)}
+  .tchip.sel{background:var(--primaryContainer);border-color:transparent}
+  .stars{color:var(--star);font-size:24px;letter-spacing:4px;margin:4px 0}
+  .slider{width:100%;accent-color:var(--primary)}
+  .save{width:100%;background:var(--primary);color:var(--onPrimary);border:none;border-radius:24px;padding:14px;font-size:15px;margin-top:12px}
+</style>
+</head>
+<body>
+<div class="phone">
+  <div class="topbar"><h1>Buch erfassen</h1></div>
+  <div class="content">
+    <input class="field" placeholder="ISBN" value="9783736223347">
+    <div class="btnrow"><button class="btn">🔍 Daten laden</button><button class="obtn">📷 ISBN scannen</button></div>
+    <div class="hint" style="margin-top:6px">Ohne ISBN: Felder unten manuell ausfüllen und speichern.</div>
+    <div class="coverprev"><div class="cover"></div><div><b>Cover</b><div class="hint">lokal gecacht (offline verfügbar)</div></div></div>
+    <label>Titel *</label><input class="field" value="Fourth Wing">
+    <label>Autor:in</label><input class="field" value="Rebecca Yarros">
+    <label>Verlag</label><input class="field" value="dtv">
+    <label>Erscheinungsjahr</label><input class="field" value="2023">
+    <label>Genre</label><input class="field" value="Fantasy">
+    <label>Subgenre</label><input class="field" value="Romantasy">
+    <label>Beschreibung / Klappentext</label><textarea class="field" rows="3">Zwanzigjährige Violet will Bibliothekarin werden…</textarea>
+    <label>Bewertung</label><div class="stars">★★★★☆</div>
+    <label>Status: Lesend ▾</label>
+    <label>Spice-Level: 4</label><input class="slider" type="range" min="0" max="5" value="4"><div class="hint">4 = häufig und explizit</div>
+    <label>Tropes / Tags</label>
+    <button class="obtn">✨ Tropes per LLM vorschlagen</button>
+    <div class="sugg"><b style="font-size:12px">LLM-Vorschläge – antippen zum Übernehmen</b>
+      <div class="tchips"><span class="tchip sel">Enemies to Lovers</span><span class="tchip sel">Forced Proximity</span><span class="tchip">Dragons</span><span class="tchip">Spice 4</span></div>
+    </div>
+    <input class="field" placeholder="Trope suchen oder neu anlegen" style="margin-top:8px">
+    <div class="tchips"><span class="tchip sel">Enemies to Lovers ✕</span><span class="tchip sel">Magic School ✕</span></div>
+    <label>Notizen</label><textarea class="field" rows="2"></textarea>
+    <button class="save">💾 Zur Bibliothek hinzufügen</button>
+  </div>
+</div>
+</body>
+</html>
