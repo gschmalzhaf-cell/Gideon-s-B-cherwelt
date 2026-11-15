@@ -112,7 +112,7 @@ class BookMetadataFetcher(
         return parseDnbDc(body, fallbackIsbn)
     }
 
-    private fun parseDnbDc(xml: String, isbn: String): BookMetadata? {
+    private fun parseDnbDc(xml: String, isbn: String?): BookMetadata? {
         val parser = Xml.newPullParser()
         parser.setInput(StringReader(xml))
         var title = ""
