@@ -15,12 +15,62 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.input.KeyboardOptions
+import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.ui.unit.dp
 import com.gideon.buecherwelt.data.local.ReadingStatus
 import com.gideon.buecherwelt.ui.theme.SpiceColor
+
+@Composable
+fun AppTextField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    label: @Composable (() -> Unit)? = null,
+    placeholder: @Composable (() -> Unit)? = null,
+    leadingIcon: @Composable (() -> Unit)? = null,
+    trailingIcon: @Composable (() -> Unit)? = null,
+    singleLine: Boolean = false,
+    minLines: Int = 1,
+    maxLines: Int = if (singleLine) 1 else Int.MAX_VALUE,
+    visualTransformation: VisualTransformation = VisualTransformation.None,
+    keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
+    interactionSource: MutableInteractionSource? = null
+) {
+    TextField(
+        value = value,
+        onValueChange = onValueChange,
+        modifier = modifier,
+        enabled = enabled,
+        label = label,
+        placeholder = placeholder,
+        leadingIcon = leadingIcon,
+        trailingIcon = trailingIcon,
+        singleLine = singleLine,
+        minLines = minLines,
+        maxLines = maxLines,
+        visualTransformation = visualTransformation,
+        keyboardOptions = keyboardOptions,
+        shape = RoundedCornerShape(12.dp),
+        colors = TextFieldDefaults.colors(
+            focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+            disabledContainerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+            focusedIndicatorColor = Color.Transparent,
+            unfocusedIndicatorColor = Color.Transparent,
+            disabledIndicatorColor = Color.Transparent
+        ),
+        interactionSource = interactionSource
+    )
+}
 
 @Composable
 fun StatusChip(status: ReadingStatus) {

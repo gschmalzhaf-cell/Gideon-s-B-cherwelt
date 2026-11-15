@@ -12,7 +12,6 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
@@ -31,6 +30,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.gideon.buecherwelt.data.settings.LlmConfig
 import com.gideon.buecherwelt.di.AppContainer
+import com.gideon.buecherwelt.ui.components.AppTextField
 import com.gideon.buecherwelt.ui.components.SectionHeader
 import com.gideon.buecherwelt.ui.navigation.Screen
 import com.gideon.buecherwelt.ui.viewModelFactory
@@ -81,7 +81,7 @@ fun SettingsScreen(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            OutlinedTextField(
+            AppTextField(
                 value = apiKey,
                 onValueChange = { apiKey = it },
                 label = { Text("API-Key") },
@@ -91,7 +91,7 @@ fun SettingsScreen(
                     .fillMaxWidth()
                     .padding(top = 8.dp)
             )
-            OutlinedTextField(
+            AppTextField(
                 value = baseUrl,
                 onValueChange = { baseUrl = it },
                 label = { Text("API-Basis-URL") },
@@ -100,7 +100,7 @@ fun SettingsScreen(
                     .fillMaxWidth()
                     .padding(top = 8.dp)
             )
-            OutlinedTextField(
+            AppTextField(
                 value = model,
                 onValueChange = { model = it },
                 label = { Text("Modell") },

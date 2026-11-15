@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -59,7 +60,11 @@ fun StatsScreen(container: AppContainer) {
                 .fillMaxSize()
         ) {
             item {
-                Card(modifier = Modifier.fillMaxWidth()) {
+                Card(
+    modifier = Modifier.fillMaxWidth(),
+    shape = MaterialTheme.shapes.large,
+    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)
+) {
                     Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Text("Bibliothek", style = MaterialTheme.typography.titleMedium)
                         ReadingStatus.entries.forEach { status ->

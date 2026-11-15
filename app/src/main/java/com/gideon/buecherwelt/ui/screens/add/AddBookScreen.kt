@@ -26,9 +26,12 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
@@ -51,6 +54,7 @@ import androidx.navigation.NavController
 import com.gideon.buecherwelt.data.local.ReadingStatus
 import com.gideon.buecherwelt.data.local.TropesCatalog
 import com.gideon.buecherwelt.di.AppContainer
+import com.gideon.buecherwelt.ui.components.AppTextField
 import com.gideon.buecherwelt.ui.components.BookCover
 import com.gideon.buecherwelt.ui.components.ErrorBanner
 import com.gideon.buecherwelt.ui.components.StarRating
@@ -163,37 +167,49 @@ fun AddBookScreen(
             }
 
             if (editBookId == null) {
-                OutlinedTextField(
-                    value = isbn,
-                    onValueChange = { isbn = it },
-                    label = { Text("ISBN / ASIN / Goodreads-ID") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Button(
-                        onClick = { viewModel.onIsbnSubmitted(isbn) },
-                        enabled = !state.loading && isbn.isNotBlank()
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        if (state.loading) {
-                            CircularProgressIndicator(modifier = Modifier.size(18.dp))
-                        } else {
-                            Icon(Icons.Default.Search, contentDescription = null)
+                        AppTextField(
+                            value = isbn,
+                            onValueChange = { isbn = it },
+                            label = { Text("ISBN / ASIN / Goodreads-ID") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Button(
+                                onClick = { viewModel.onIsbnSubmitted(isbn) },
+                                enabled = !state.loading && isbn.isNotBlank()
+                            ) {
+                                if (state.loading) {
+                                    CircularProgressIndicator(modifier = Modifier.size(18.dp))
+                                } else {
+                                    Icon(Icons.Default.Search, contentDescription = null)
+                                }
+                                Spacer(Modifier.width(8.dp))
+                                Text("Daten laden")
+                            }
+                            OutlinedButton(onClick = { navController.navigate(Screen.Scanner.route) }) {
+                                Icon(Icons.Default.QrCodeScanner, contentDescription = null)
+                                Spacer(Modifier.width(8.dp))
+                                Text("ISBN scannen")
+                            }
                         }
-                        Spacer(Modifier.width(8.dp))
-                        Text("Daten laden")
-                    }
-                    OutlinedButton(onClick = { navController.navigate(Screen.Scanner.route) }) {
-                        Icon(Icons.Default.QrCodeScanner, contentDescription = null)
-                        Spacer(Modifier.width(8.dp))
-                        Text("ISBN scannen")
+                        Text(
+                            text = "Ohne Kennung: Felder unten manuell ausfüllen und speichern.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
                 }
-                Text(
-                    text = "Ohne Kennung: Felder unten manuell ausfüllen und speichern.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
             }
 
             formInit?.let { init ->
@@ -231,19 +247,19 @@ fun AddBookScreen(
                 }
             }
 
-            OutlinedTextField(value = title, onValueChange = { title = it }, label = { Text("Titel *") }, modifier = Modifier.fillMaxWidth())
-            OutlinedTextField(value = author, onValueChange = { author = it }, label = { Text("Autor:in") }, modifier = Modifier.fillMaxWidth())
-            OutlinedTextField(value = publisher, onValueChange = { publisher = it }, label = { Text("Verlag") }, modifier = Modifier.fillMaxWidth())
-            OutlinedTextField(
+            AppTextField(value = title, onValueChange = { title = it }, label = { Text("Titel *") }, modifier = Modifier.fillMaxWidth())
+            AppTextField(value = author, onValueChange = { author = it }, label = { Text("Autor:in") }, modifier = Modifier.fillMaxWidth())
+            AppTextField(value = publisher, onValueChange = { publisher = it }, label = { Text("Verlag") }, modifier = Modifier.fillMaxWidth())
+            AppTextField(
                 value = yearText,
                 onValueChange = { yearText = it.filter { c -> c.isDigit() }.take(4) },
                 label = { Text("Erscheinungsjahr") },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth()
             )
-            OutlinedTextField(value = genre, onValueChange = { genre = it }, label = { Text("Genre") }, modifier = Modifier.fillMaxWidth())
-            OutlinedTextField(value = subgenre, onValueChange = { subgenre = it }, label = { Text("Subgenre") }, modifier = Modifier.fillMaxWidth())
-            OutlinedTextField(
+            AppTextField(value = genre, onValueChange = { genre = it }, label = { Text("Genre") }, modifier = Modifier.fillMaxWidth())
+            AppTextField(value = subgenre, onValueChange = { subgenre = it }, label = { Text("Subgenre") }, modifier = Modifier.fillMaxWidth())
+            AppTextField(
                 value = description,
                 onValueChange = { description = it },
                 label = { Text("Beschreibung / Klappentext") },
@@ -251,24 +267,36 @@ fun AddBookScreen(
                 modifier = Modifier.fillMaxWidth()
             )
 
-            Text("Bewertung", style = MaterialTheme.typography.labelLarge)
-            StarRating(rating = rating, onRatingChange = { rating = it }, size = 28)
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text("Bewertung", style = MaterialTheme.typography.labelLarge)
+                    StarRating(rating = rating, onRatingChange = { rating = it }, size = 28)
 
-            StatusDropdown(status = status, onChange = { status = it })
+                    StatusDropdown(status = status, onChange = { status = it })
 
-            Text("Spice-Level: $spice", style = MaterialTheme.typography.labelLarge)
-            Text(
-                TropesCatalog.spiceLevels.first { it.first == spice }.second,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Slider(
-                value = spice.toFloat(),
-                onValueChange = { spice = it.toInt() },
-                valueRange = 0f..5f,
-                steps = 4,
-                modifier = Modifier.fillMaxWidth()
-            )
+                    Text("Spice-Level: $spice", style = MaterialTheme.typography.labelLarge)
+                    Text(
+                        TropesCatalog.spiceLevels.first { it.first == spice }.second,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Slider(
+                        value = spice.toFloat(),
+                        onValueChange = { spice = it.toInt() },
+                        valueRange = 0f..5f,
+                        steps = 4,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            }
 
             Text("Tropes / Tags", style = MaterialTheme.typography.labelLarge)
             if (state.llmConfigured && formInit != null && editBookId == null) {
@@ -309,7 +337,7 @@ fun AddBookScreen(
                 onSelectionChange = { selectedTropes = it }
             )
 
-            OutlinedTextField(
+            AppTextField(
                 value = notes,
                 onValueChange = { notes = it },
                 label = { Text("Notizen") },

@@ -18,6 +18,12 @@ val PlusJakartaSans = FontFamily(
     Font(R.font.plus_jakarta_sans_italic_400, FontWeight.Normal, FontStyle.Italic)
 )
 
+val PlayfairDisplay = FontFamily(
+    Font(R.font.playfair_display_600, FontWeight.SemiBold),
+    Font(R.font.playfair_display_700, FontWeight.Bold),
+    Font(R.font.playfair_display_italic_600, FontWeight.SemiBold, FontStyle.Italic)
+)
+
 val AppTypography = Typography(
     displayLarge = TextStyle(fontFamily = PlusJakartaSans, fontSize = 57.sp, lineHeight = 64.sp, fontWeight = FontWeight.Normal),
     displayMedium = TextStyle(fontFamily = PlusJakartaSans, fontSize = 45.sp, lineHeight = 52.sp, fontWeight = FontWeight.Normal),

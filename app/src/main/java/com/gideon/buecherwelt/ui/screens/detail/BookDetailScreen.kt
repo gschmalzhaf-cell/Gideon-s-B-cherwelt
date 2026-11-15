@@ -22,6 +22,7 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -47,6 +48,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.ui.text.font.FontWeight
+import com.gideon.buecherwelt.ui.theme.PlayfairDisplay
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
@@ -121,35 +127,48 @@ fun BookDetailScreen(
                 .fillMaxSize()
         ) {
             item {
-                Row {
-                    BookCover(
-                        coverPath = current.coverPath,
-                        coverUrl = current.coverUrl,
-                        contentDescription = current.title,
-                        modifier = Modifier
-                            .width(120.dp)
-                            .aspectRatio(2f / 3f)
-                    )
-                    Column(modifier = Modifier.padding(start = 16.dp)) {
-                        Text(current.title, style = MaterialTheme.typography.titleLarge)
-                        if (current.author.isNotBlank()) {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = MaterialTheme.shapes.extraLarge,
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                ) {
+                    Row(modifier = Modifier.padding(16.dp)) {
+                        BookCover(
+                            coverPath = current.coverPath,
+                            coverUrl = current.coverUrl,
+                            contentDescription = current.title,
+                            modifier = Modifier
+                                .width(115.dp)
+                                .aspectRatio(2f / 3f)
+                        )
+                        Column(modifier = Modifier.padding(start = 16.dp)) {
+                            StatusChip(status = current.status)
+                            Spacer(Modifier.height(8.dp))
                             Text(
-                                current.author,
-                                style = MaterialTheme.typography.titleSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                current.title,
+                                style = MaterialTheme.typography.titleLarge,
+                                fontFamily = PlayfairDisplay,
+                                fontWeight = FontWeight.Bold
                             )
-                        }
-                        Spacer(Modifier.height(8.dp))
-                        StatusChip(status = current.status)
-                        Spacer(Modifier.height(8.dp))
-                        StarRating(rating = current.rating ?: 0, size = 24)
-                        Spacer(Modifier.height(8.dp))
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text("Spice:", style = MaterialTheme.typography.bodyMedium)
-                            Spacer(Modifier.width(4.dp))
-                            SpiceFlames(level = current.spiceLevel)
-                            if (current.spiceLevel != null) {
-                                Text(" ${current.spiceLevel}/5", style = MaterialTheme.typography.bodyMedium)
+                            if (current.author.isNotBlank()) {
+                                Text(
+                                    current.author,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+                            Spacer(Modifier.height(8.dp))
+                            StarRating(rating = current.rating ?: 0, size = 20)
+                            Spacer(Modifier.height(8.dp))
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text("Spice:", style = MaterialTheme.typography.bodyMedium)
+                                Spacer(Modifier.width(4.dp))
+                                SpiceFlames(level = current.spiceLevel)
+                                if (current.spiceLevel != null) {
+                                    Text(" ${current.spiceLevel}/5", style = MaterialTheme.typography.bodyMedium)
+                                }
                             }
                         }
                     }
@@ -157,11 +176,20 @@ fun BookDetailScreen(
             }
             item {
                 SectionHeader("Details")
-                InfoRow("ISBN", current.isbn ?: "–")
-                InfoRow("Verlag", current.publisher)
-                InfoRow("Erscheinungsjahr", current.publishedYear?.toString() ?: "–")
-                InfoRow("Genre", current.genre)
-                InfoRow("Subgenre", current.subgenre)
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = MaterialTheme.shapes.large,
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        InfoRow("ISBN", current.isbn ?: "–")
+                        InfoRow("Verlag", current.publisher)
+                        InfoRow("Erscheinungsjahr", current.publishedYear?.toString() ?: "–")
+                        InfoRow("Genre", current.genre)
+                        InfoRow("Subgenre", current.subgenre)
+                    }
+                }
             }
             if (current.tropes.isNotEmpty()) {
                 item {
@@ -171,7 +199,16 @@ fun BookDetailScreen(
                         verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         current.tropes.forEach { trope ->
-                            FilterChip(selected = true, onClick = {}, label = { Text(trope.name) })
+                            FilterChip(
+                                selected = true,
+                                onClick = {},
+                                label = { Text(trope.name) },
+                                shape = CircleShape,
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                                    selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer
+                                )
+                            )
                         }
                     }
                 }
@@ -253,9 +290,13 @@ private fun SimilarBookCard(
     candidate: ScoredCandidate,
     onAdd: () -> Unit
 ) {
-    Card(modifier = Modifier
-        .fillMaxWidth()
-        .padding(vertical = 4.dp)) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
+        shape = MaterialTheme.shapes.large,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)
+    ) {
         Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.Top) {
             BookCover(
                 coverPath = null,

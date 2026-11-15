@@ -1,3 +1,18 @@
+# Gideon's Bücherwelt – v1.0.4
+
+Weitere Design-Nachbesserung Richtung Google Stitch (alle Screens).
+
+## Design
+- **Alle Eingabefelder** jetzt im Stitch-Stil: gefüllt (`surfaceContainerLow`), 12dp Radius, ohne Outline-Box (statt OutlinedTextField) — über gemeinsame `AppTextField`-Komponente in Bibliothek, Erfassen, Einstellungen, Tropes
+- **Karten** überall konsistent: `surfaceContainerLow`, 16dp Radius — Entdecken, Statistik, Buchdetail (Hero als 24dp-Container mit Border, Details als Card), „Ähnliche Bücher"
+- **Buchdetail-Hero** wie Stitch: Cover 115dp + Status-Chip + Titel in **Playfair Display** (Serif, gebundelt) + Autor:in in primary semibold
+- **Buch erfassen**: ISBN/ASIN-Bereich und Bewertung/Status/Spice als Section-Cards (surface, 12dp, dezenter Border) wie im Stitch-Screen
+- Trope-Chips auf dem Detail-Screen als Pills in primaryContainer
+
+**Full Changelog**: https://github.com/gschmalzhaf-cell/Gideon-s-B-cherwelt/commits/v1.0.4
+
+---
+
 # Gideon's Bücherwelt – v1.0.3
 
 Design-Treue zum Google-Stitch-Design-System erhöht.

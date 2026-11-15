@@ -19,6 +19,7 @@ import androidx.compose.material.icons.filled.BookmarkAdd
 import androidx.compose.material.icons.filled.BookmarkRemove
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -88,7 +89,11 @@ fun DiscoverScreen(
             item {
                 if (state.error != null || state.message != null) {
                     val text = state.error ?: state.message!!
-                    Card(modifier = Modifier.fillMaxWidth()) {
+                    Card(
+    modifier = Modifier.fillMaxWidth(),
+    shape = MaterialTheme.shapes.large,
+    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)
+) {
                         Row(
                             modifier = Modifier.padding(12.dp),
                             verticalAlignment = Alignment.CenterVertically
@@ -219,7 +224,11 @@ private fun CandidateCard(
     onAdd: () -> Unit,
     onToggleWishlist: () -> Unit
 ) {
-    Card(modifier = Modifier.fillMaxWidth()) {
+    Card(
+    modifier = Modifier.fillMaxWidth(),
+    shape = MaterialTheme.shapes.large,
+    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)
+) {
         Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.Top) {
             BookCover(
                 coverPath = null,
@@ -276,7 +285,11 @@ private fun WishlistCard(
     onAdd: () -> Unit,
     onRemove: () -> Unit
 ) {
-    Card(modifier = Modifier.fillMaxWidth()) {
+    Card(
+    modifier = Modifier.fillMaxWidth(),
+    shape = MaterialTheme.shapes.large,
+    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)
+) {
         Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
             BookCover(
                 coverPath = item.coverPath,
