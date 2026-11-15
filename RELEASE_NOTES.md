@@ -1,3 +1,19 @@
+# Gideon's Bücherwelt – v1.0.3
+
+Design-Treue zum Google-Stitch-Design-System erhöht.
+
+## Design
+- **Schriftart Plus Jakarta Sans** (Stitch-Font) jetzt in der ganzen App gebundelt (Gewichte 400–800 + kursiv) statt Systemschrift; Typografie-Skala gemäß Stitch (title-lg 22/600, title-md 16/600, body-md 14/400, body-sm 12/400, label-md 12/500)
+- **Shapes**: Karten 16dp, Suchfeld 12dp, Chips/Status-Chips pill (voll gerundet)
+- **Surface-Tonal-Layering** wie in Stitch: Buchkarten und Suchfeld in `surfaceContainerLow`, Filter-Chips in `surfaceContainer`
+- **Top-App-Bar** wie Stitch: Logo-Kreis (primaryContainer) + Titel in primary, bold
+- **Bottom-Navigation**: aktiver Tab als Pill in `primaryContainer`; **Filter-Chips** als Pills, aktiver Filter in `primary`
+- Buchkarten-Titel semibold; Doku (`design/DESIGN.md`, `design/stitch/SCREENS.md`) aktualisiert
+
+**Full Changelog**: https://github.com/gschmalzhaf-cell/Gideon-s-B-cherwelt/commits/v1.0.3
+
+---
+
 # Gideon's Bücherwelt – v1.0.2
 
 Verbesserungen bei der Buch-Suche.

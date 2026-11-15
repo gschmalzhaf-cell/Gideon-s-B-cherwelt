@@ -52,13 +52,13 @@ Dark Mode ist in den Einstellungen umschaltbar (System / Hell / Dunkel), Default
 
 ## 2. Typografie
 
-Material-3-Default-Typografie (sans-serif, system font):
-- Display/Top-App-Bar-Titel: `titleLarge` (22sp)
-- Screen-Titel in TopAppBar: `titleLarge`
-- Abschnitts-Überschriften (SectionHeader): `titleMedium` (16sp, semibold)
-- Buchkarten-Titel: `bodyMedium` (14sp, max 2 Zeilen, Ellipsis)
-- Nebentext (Autor, Metadaten): `bodySmall` (12sp, onSurfaceVariant)
-- Chips/Labels: `labelLarge` / `labelSmall`
+**Plus Jakarta Sans** (im App gebundelt unter `app/src/main/res/font/`, Gewichte 400/500/600/700/800 + kursiv 400; wired in `ui/theme/Type.kt`):
+- `titleLarge` 22sp / 600 / lh 28 (Top-App-Bar-Titel, dort zusätzlich Bold 700 + primary)
+- `titleMedium` 16sp / 600 / lh 24 (SectionHeader)
+- `bodyMedium` 14sp / 400 / lh 20 (Buchkarten-Titel semibold, max 2 Zeilen, Ellipsis)
+- `bodySmall` 12sp / 400 / lh 16 (Autor, Metadaten, onSurfaceVariant)
+- `labelMedium` 12sp / 500 / lh 16 (Chips/Filter)
+- Shapes (`ui/theme/Shape.kt`): small 8dp, medium 12dp, large 16dp (Karten), extraLarge 24dp; Buttons/Chips pill
 
 ## 3. Spacing-System
 
@@ -76,7 +76,7 @@ Grid-Gap Bibliothek: 12dp. Bottom-Nav-Höhe: Standard (80dp). FAB: Standard, rec
 | Trope-Chip | FilterChip, pill, selected = primaryContainer; mit ×-Trailing-Icon wenn abwählbar |
 | LLM-Vorschlags-Chips | FilterChip in einem surface-Container mit Label „LLM-Vorschläge – antippen zum Übernehmen" |
 | Sterne-Bewertung | 5 Sterne, gefüllt = #C89B3C (Star), leer = StarBorder in onSurfaceVariant; klickbar (erneuter Klick auf akt. Stern = 0) |
-| Status-Chip | pill 8dp radius, Farbe je Status (s. Tabelle) |
+| Status-Chip | pill (voll gerundet), Farbe je Status (s. Tabelle) |
 | Spice-Level | Reihe aus bis zu 5 Flammen-Icons (#E25822) + „x/5" |
 | Filterleiste | Suchfeld (volle Breite, Search-Icon) + horizontal scrollbare Reihe aus Dropdown-Buttons (Genre / Status / Bewertung / Trope) |
 | Dropdown-Filter | OutlinedButton mit Label + ArrowDropDown; Menü: „Alle" + Optionen |
@@ -99,6 +99,6 @@ Grid-Gap Bibliothek: 12dp. Bottom-Nav-Höhe: Standard (80dp). FAB: Standard, rec
 
 ## 6. Umsetzungstreue
 
-- Compose-Tokens siehe `app/src/main/java/com/gideon/buecherwelt/ui/theme/Color.kt` (exakt die Hex-Werte oben).
+- Compose-Tokens siehe `app/src/main/java/com/gideon/buecherwelt/ui/theme/Color.kt` (exakt die Hex-Werte oben), Typografie/Shapes in `ui/theme/Type.kt` / `Shape.kt`, gewired in `Theme.kt`.
 - Komponenten siehe `ui/components/` (BookCard, BookCover, StarRating, TropePicker, SuggestionChips, FilterBar, Common.kt).
 - Prüfung: Screenshots der App mit den Pixso-Mockups vergleichen (Layout, Farben, Abstände).

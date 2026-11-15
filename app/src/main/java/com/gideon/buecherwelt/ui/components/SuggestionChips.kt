@@ -6,7 +6,9 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -51,7 +53,12 @@ fun SuggestionChips(
                         FilterChip(
                             selected = trope in selectedTropes,
                             onClick = { onTropeToggle(trope) },
-                            label = { Text(trope) }
+                            label = { Text(trope) },
+                            shape = CircleShape,
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                                selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
                         )
                     }
                 }
@@ -70,7 +77,12 @@ fun SuggestionChips(
                         FilterChip(
                             selected = genre in selectedGenres,
                             onClick = { onGenreToggle(genre) },
-                            label = { Text(genre) }
+                            label = { Text(genre) },
+                            shape = CircleShape,
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                                selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
                         )
                     }
                 }
@@ -85,7 +97,12 @@ fun SuggestionChips(
                     FilterChip(
                         selected = selectedSpice == suggestions.spice,
                         onClick = { onSpiceSelected(suggestions.spice!!) },
-                        label = { Text("Spice ${suggestions.spice}") }
+                        label = { Text("Spice ${suggestions.spice}") },
+                        shape = CircleShape,
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                            selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
                     )
                 }
             }

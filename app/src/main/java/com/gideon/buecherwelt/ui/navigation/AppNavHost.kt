@@ -6,8 +6,10 @@ import androidx.compose.material.icons.filled.Book
 import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -65,6 +67,11 @@ fun AppNavHost(
     )
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
+    val navItemColors = NavigationBarItemDefaults.colors(
+        indicatorColor = MaterialTheme.colorScheme.primaryContainer,
+        selectedIconColor = MaterialTheme.colorScheme.onPrimaryContainer,
+        selectedTextColor = MaterialTheme.colorScheme.onPrimaryContainer
+    )
 
     fun navigateToMain(route: String) {
         navController.navigate(route) {
@@ -84,25 +91,29 @@ fun AppNavHost(
                         selected = currentRoute == Screen.Library.route,
                         onClick = { navigateToMain(Screen.Library.route) },
                         icon = { Icon(Icons.Default.Book, contentDescription = null) },
-                        label = { Text("Bibliothek") }
+                        label = { Text("Bibliothek") },
+                        colors = navItemColors
                     )
                     NavigationBarItem(
                         selected = currentRoute == Screen.Discover.route,
                         onClick = { navigateToMain(Screen.Discover.route) },
                         icon = { Icon(Icons.Default.Explore, contentDescription = null) },
-                        label = { Text("Entdecken") }
+                        label = { Text("Entdecken") },
+                        colors = navItemColors
                     )
                     NavigationBarItem(
                         selected = currentRoute == Screen.Stats.route,
                         onClick = { navigateToMain(Screen.Stats.route) },
                         icon = { Icon(Icons.Default.BarChart, contentDescription = null) },
-                        label = { Text("Statistik") }
+                        label = { Text("Statistik") },
+                        colors = navItemColors
                     )
                     NavigationBarItem(
                         selected = currentRoute == Screen.Settings.route,
                         onClick = { navigateToMain(Screen.Settings.route) },
                         icon = { Icon(Icons.Default.Settings, contentDescription = null) },
-                        label = { Text("Einstellungen") }
+                        label = { Text("Einstellungen") },
+                        colors = navItemColors
                     )
                 }
             }

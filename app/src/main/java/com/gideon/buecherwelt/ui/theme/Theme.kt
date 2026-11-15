@@ -23,7 +23,14 @@ private val LightColors = lightColorScheme(
     onSurface = LightOnSurface,
     onSurfaceVariant = LightOnSurfaceVariant,
     error = LightError,
-    errorContainer = LightErrorContainer
+    errorContainer = LightErrorContainer,
+    surfaceContainerLowest = LightSurfaceContainerLowest,
+    surfaceContainerLow = LightSurfaceContainerLow,
+    surfaceContainer = LightSurfaceContainer,
+    surfaceContainerHigh = LightSurfaceContainerHigh,
+    surfaceContainerHighest = LightSurfaceContainerHighest,
+    outline = LightOutline,
+    outlineVariant = LightOutlineVariant
 )
 
 private val DarkColors = darkColorScheme(
@@ -43,7 +50,14 @@ private val DarkColors = darkColorScheme(
     onSurface = DarkOnSurface,
     onSurfaceVariant = DarkOnSurfaceVariant,
     error = DarkError,
-    errorContainer = DarkErrorContainer
+    errorContainer = DarkErrorContainer,
+    surfaceContainerLowest = DarkSurfaceContainerLowest,
+    surfaceContainerLow = DarkSurfaceContainerLow,
+    surfaceContainer = DarkSurfaceContainer,
+    surfaceContainerHigh = DarkSurfaceContainerHigh,
+    surfaceContainerHighest = DarkSurfaceContainerHighest,
+    outline = DarkOutline,
+    outlineVariant = DarkOutlineVariant
 )
 
 @Composable
@@ -58,6 +72,8 @@ fun BuecherweltTheme(
     }
     MaterialTheme(
         colorScheme = if (darkTheme) DarkColors else LightColors,
+        typography = AppTypography,
+        shapes = AppShapes,
         content = content
     )
 }

@@ -6,6 +6,8 @@ Designgebende Quelle für die App-UI ist das Google-Stitch-Projekt (ersetzt Pixs
 - **Design-System:** `assets/3041670234388923945` – „Bücherwelt – Warmes Bibliotheks-Theme (Light + Dark)"
   - Seed/Primary `#7A4E2D`, Secondary `#5D6B3F`, Tertiary `#C89B3C`, Neutral `#FAF5EF`, FIDELITY, ROUND_TWELVE/EIGHT
   - Font: Plus Jakarta Sans (body/headline/label); Spacing 4dp-Raster (space-xs…space-xl, gutter, margin)
+  - Type-Scale: title-lg 22px/600/lh28, title-md 16px/600/lh24, body-md 14px/400/lh20, body-sm 12px/400/lh16, label-md 12px/500/lh16; Radius: DEFAULT 4px, lg 8px, xl 12px, Karten 16px (rounded-2xl), Chips/Buttons pill
+  - Surface-Tonal-Layering: surface-container-low #f8f3ed (Karten/Suchfeld), surface-container #f2ede7 (Filter-Chips), outline-variant #d5c3b8; TopBar: Logo-Kreis + Titel in primary bold; aktiver Bottom-Nav-Tab als Pill in primary-container
   - designMd enthält die komplette Spezifikation (Farben Light+Dark, Komponenten, Screens) – siehe auch `../DESIGN.md`
 
 ## Generierte Screens (alle MOBILE, 780px breit, screenType DESIGN mit HTML-Code + Screenshot)
