@@ -132,7 +132,7 @@ private fun <T> FilterDropdown(
             colors = FilterChipDefaults.filterChipColors(
                 containerColor = MaterialTheme.colorScheme.surfaceContainer,
                 labelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                trailingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                iconColor = MaterialTheme.colorScheme.onSurfaceVariant,
                 selectedContainerColor = MaterialTheme.colorScheme.primary,
                 selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
                 selectedTrailingIconColor = MaterialTheme.colorScheme.onPrimary
