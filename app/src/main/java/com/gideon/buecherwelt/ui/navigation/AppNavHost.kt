@@ -33,6 +33,7 @@ import com.gideon.buecherwelt.ui.screens.import.ImportScreen
 import com.gideon.buecherwelt.ui.screens.tropes.TropeManagerScreen
 import com.gideon.buecherwelt.ui.screens.library.LibraryScreen
 import com.gideon.buecherwelt.ui.screens.scanner.BarcodeScannerScreen
+import com.gideon.buecherwelt.ui.screens.scanner.CoverScannerScreen
 import com.gideon.buecherwelt.ui.screens.settings.SettingsScreen
 import com.gideon.buecherwelt.ui.screens.stats.StatsScreen
 
@@ -49,6 +50,7 @@ sealed class Screen(val route: String) {
             if (editBookId == null) "add" else "add?editBookId=$editBookId"
     }
     data object Scanner : Screen("scanner")
+    data object CoverScanner : Screen("cover-scanner")
     data object Tropes : Screen("tropes")
     data object Import : Screen("import")
 }
@@ -59,6 +61,7 @@ fun AppNavHost(
     navController: NavHostController = rememberNavController()
 ) {
     val scannedIsbn = remember { mutableStateOf<String?>(null) }
+    val coverImagePath = remember { mutableStateOf<String?>(null) }
     val mainRoutes = listOf(
         Screen.Library.route,
         Screen.Discover.route,
@@ -165,13 +168,23 @@ fun AppNavHost(
                     container = container,
                     navController = navController,
                     editBookId = editBookId,
-                    scannedIsbn = scannedIsbn
+                    scannedIsbn = scannedIsbn,
+                    coverImagePath = coverImagePath
                 )
             }
             composable(Screen.Scanner.route) {
                 BarcodeScannerScreen(
                     onIsbn = { isbn ->
                         scannedIsbn.value = isbn
+                        navController.popBackStack()
+                    },
+                    onClose = { navController.popBackStack() }
+                )
+            }
+            composable(Screen.CoverScanner.route) {
+                CoverScannerScreen(
+                    onImage = { path ->
+                        coverImagePath.value = path
                         navController.popBackStack()
                     },
                     onClose = { navController.popBackStack() }

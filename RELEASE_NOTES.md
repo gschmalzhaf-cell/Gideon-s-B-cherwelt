@@ -1,3 +1,19 @@
+# Gideon's Bücherwelt – v1.0.6
+
+Cover-Scan als Recherche-Alternative, wenn die ISBN nichts bringt.
+
+## Neu
+- **„Cover scannen"** im Erfassungs-Screen (Foto aufnehmen per Kamera oder aus der Galerie): Die App erkennt das Buch per **LLM-Vision** (konfigurierter API-Key, Bild als base64 an das Modell) oder per **OCR (ML Kit Texterkennung)** und lädt die Metadaten dann über die ISBN-/Titel-Suche (Google Books / Open Library / DNB)
+- Neue Kamera-Ansicht „CoverScannerScreen" (CameraX ImageCapture)
+- Versionsnummer jetzt in den Einstellungen („Über") sichtbar
+
+## Fixes
+- Fehlermeldung bei erfolgloser Kennung nennt jetzt die geprüften Quellen (Google Books, Open Library, DNB)
+
+**Full Changelog**: https://github.com/gschmalzhaf-cell/Gideon-s-B-cherwelt/commits/v1.0.6
+
+---
+
 # Gideon's Bücherwelt – v1.0.5
 
 ISBN-Lookup deutlich robuster (z. B. gescannte ISBN 9783453292819, die weder Google Books noch Open Library direkt lieferten).

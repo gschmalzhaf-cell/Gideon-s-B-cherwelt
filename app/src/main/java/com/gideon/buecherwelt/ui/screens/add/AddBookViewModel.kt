@@ -8,8 +8,10 @@ import com.gideon.buecherwelt.data.network.CoverCache
 import com.gideon.buecherwelt.data.network.FetchResult
 import com.gideon.buecherwelt.data.settings.LlmConfig
 import com.gideon.buecherwelt.data.settings.SettingsRepository
+import com.gideon.buecherwelt.domain.llm.CoverIdentifier
 import com.gideon.buecherwelt.domain.llm.LlmService
 import com.gideon.buecherwelt.domain.llm.TropeSuggestion
+import com.gideon.buecherwelt.data.network.BookMetadata
 import com.gideon.buecherwelt.domain.model.Book
 import com.gideon.buecherwelt.domain.model.Trope
 import com.gideon.buecherwelt.domain.repository.BookRepository
@@ -78,6 +80,7 @@ class AddBookViewModel(
     private val coverCache: CoverCache,
     settingsRepository: SettingsRepository,
     private val llmService: LlmService,
+    private val coverIdentifier: CoverIdentifier,
     private val editBookId: Long?
 ) : ViewModel() {
 
@@ -135,33 +138,11 @@ class AddBookViewModel(
         viewModelScope.launch {
             _state.update { it.copy(loading = true, error = null, suggestions = null) }
             when (val result = metadataFetcher.fetchByIsbn(rawIsbn)) {
-                is FetchResult.Success -> {
-                    val meta = result.metadata
-                    val coverPath = meta.coverUrl?.let {
-                        coverCache.download(it, CoverCache.keyFor(meta.isbn, meta.title, meta.author))
-                    }
-                    _state.update {
-                        it.copy(
-                            loading = false,
-                            formInit = FormInit(
-                                isbn = meta.isbn ?: BookMetadataFetcher.normalizeIsbn(rawIsbn),
-                                title = meta.title,
-                                author = meta.author,
-                                publisher = meta.publisher,
-                                publishedYear = meta.publishedYear,
-                                description = meta.description,
-                                genre = meta.categories.firstOrNull().orEmpty(),
-                                subgenre = meta.categories.getOrNull(1).orEmpty(),
-                                coverUrl = meta.coverUrl,
-                                coverPath = coverPath
-                            )
-                        )
-                    }
-                }
+                is FetchResult.Success -> applyMetadata(result.metadata, rawIsbn)
                 is FetchResult.NotFound -> _state.update {
                     it.copy(
                         loading = false,
-                        error = "Zu dieser Kennung wurden keine Daten gefunden. Du kannst das Buch unten manuell anlegen."
+                        error = "Zu dieser Kennung wurden keine Daten gefunden (Google Books, Open Library und DNB gepr\u00fcft). Du kannst das Buch unten manuell anlegen."
                     )
                 }
                 is FetchResult.NoNetwork -> _state.update {
@@ -174,6 +155,54 @@ class AddBookViewModel(
                     it.copy(loading = false, error = result.message)
                 }
             }
+        }
+    }
+
+    fun onCoverImageFailed() {
+        _state.update { it.copy(loading = false, error = "Bild konnte nicht geladen werden.") }
+    }
+
+    fun onCoverImage(path: String) {
+        viewModelScope.launch {
+            _state.update { it.copy(loading = true, error = null, suggestions = null) }
+            when (val result = coverIdentifier.identify(path, llmConfig)) {
+                is FetchResult.Success -> applyMetadata(result.metadata, result.metadata.isbn)
+                is FetchResult.NotFound -> _state.update {
+                    it.copy(
+                        loading = false,
+                        error = "Buch auf dem Cover nicht erkannt (LLM/OCR + Google Books/Open Library/DNB). Bitte manuell ausf\u00fcllen."
+                    )
+                }
+                is FetchResult.NoNetwork -> _state.update {
+                    it.copy(loading = false, error = "Keine Netzwerkverbindung. Manuelle Erfassung ist trotzdem m\u00f6glich.")
+                }
+                is FetchResult.Error -> _state.update {
+                    it.copy(loading = false, error = result.message)
+                }
+            }
+        }
+    }
+
+    private suspend fun applyMetadata(meta: BookMetadata, rawIsbn: String?) {
+        val coverPath = meta.coverUrl?.let {
+            coverCache.download(it, CoverCache.keyFor(meta.isbn, meta.title, meta.author))
+        }
+        _state.update {
+            it.copy(
+                loading = false,
+                formInit = FormInit(
+                    isbn = meta.isbn ?: rawIsbn?.let { r -> BookMetadataFetcher.normalizeIsbn(r) },
+                    title = meta.title,
+                    author = meta.author,
+                    publisher = meta.publisher,
+                    publishedYear = meta.publishedYear,
+                    description = meta.description,
+                    genre = meta.categories.firstOrNull().orEmpty(),
+                    subgenre = meta.categories.getOrNull(1).orEmpty(),
+                    coverUrl = meta.coverUrl,
+                    coverPath = coverPath
+                )
+            )
         }
     }
 

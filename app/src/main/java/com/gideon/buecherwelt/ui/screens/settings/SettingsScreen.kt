@@ -154,7 +154,7 @@ fun SettingsScreen(
 
             SectionHeader("Über")
             Text(
-                "Gideon's Bücherwelt – persönliche Bibliothek, 100 % lokal (Room-Datenbank). Netzwerk wird nur für ISBN-/ASIN-/Goodreads-Abfragen, Cover-Downloads und optionale LLM-Aufrufe genutzt.",
+                "Gideon's Bücherwelt – Version ${com.gideon.buecherwelt.BuildConfig.VERSION_NAME} – persönliche Bibliothek, 100 % lokal (Room-Datenbank). Netzwerk wird nur für ISBN-/ASIN-/Goodreads-/Cover-Abfragen, Cover-Downloads und optionale LLM-Aufrufe genutzt.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

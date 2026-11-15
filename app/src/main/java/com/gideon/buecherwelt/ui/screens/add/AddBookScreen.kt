@@ -15,6 +15,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.Search
@@ -47,7 +48,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import java.io.File
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
@@ -69,7 +74,8 @@ fun AddBookScreen(
     container: AppContainer,
     navController: NavController,
     editBookId: Long?,
-    scannedIsbn: MutableState<String?>
+    scannedIsbn: MutableState<String?>,
+    coverImagePath: MutableState<String?>
 ) {
     val viewModel: AddBookViewModel = viewModel(
         factory = viewModelFactory {
@@ -80,6 +86,7 @@ fun AddBookScreen(
                 coverCache = container.coverCache,
                 settingsRepository = container.settingsRepository,
                 llmService = container.llmService,
+                coverIdentifier = container.coverIdentifier,
                 editBookId = editBookId
             )
         }
@@ -110,6 +117,30 @@ fun AddBookScreen(
             scannedIsbn.value = null
             isbn = scanned
             viewModel.onIsbnSubmitted(scanned)
+        }
+    }
+
+    val context = LocalContext.current
+    var showCoverDialog by remember { mutableStateOf(false) }
+    val galleryLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        uri?.let {
+            try {
+                val file = File(context.cacheDir, "cover_gallery_${System.currentTimeMillis()}.jpg")
+                context.contentResolver.openInputStream(it)?.use { input ->
+                    file.outputStream().use { out -> input.copyTo(out) }
+                }
+                viewModel.onCoverImage(file.absolutePath)
+            } catch (e: Exception) {
+                viewModel.onCoverImageFailed()
+            }
+        }
+    }
+
+    LaunchedEffect(coverImagePath.value) {
+        val path = coverImagePath.value
+        if (!path.isNullOrBlank()) {
+            coverImagePath.value = null
+            viewModel.onCoverImage(path)
         }
     }
 
@@ -202,6 +233,14 @@ fun AddBookScreen(
                                 Spacer(Modifier.width(8.dp))
                                 Text("ISBN scannen")
                             }
+                        }
+                        OutlinedButton(
+                            onClick = { showCoverDialog = true },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(Icons.Default.PhotoCamera, contentDescription = null)
+                            Spacer(Modifier.width(8.dp))
+                            Text("Cover scannen (Foto/Galerie)")
                         }
                         Text(
                             text = "Ohne Kennung: Felder unten manuell ausfüllen und speichern.",
@@ -361,6 +400,33 @@ fun AddBookScreen(
             }
             Spacer(Modifier.height(24.dp))
         }
+    }
+
+    if (showCoverDialog) {
+        AlertDialog(
+            onDismissRequest = { showCoverDialog = false },
+            title = { Text("Cover scannen") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        "Foto aufnehmen oder aus der Galerie wählen. Die App erkennt das Buch " +
+                            "per LLM (falls in den Einstellungen konfiguriert) oder Texterkennung (OCR) " +
+                            "und lädt die Metadaten über Google Books / Open Library / DNB."
+                    )
+                    TextButton(onClick = {
+                        showCoverDialog = false
+                        navController.navigate(Screen.CoverScanner.route)
+                    }) { Text("Foto aufnehmen") }
+                    TextButton(onClick = {
+                        showCoverDialog = false
+                        galleryLauncher.launch("image/*")
+                    }) { Text("Aus Galerie wählen") }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showCoverDialog = false }) { Text("Abbrechen") }
+            }
+        )
     }
 
     when (val result = saveResult) {
