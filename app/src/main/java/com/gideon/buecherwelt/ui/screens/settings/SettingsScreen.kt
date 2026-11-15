@@ -109,6 +109,12 @@ fun SettingsScreen(
                     .fillMaxWidth()
                     .padding(top = 8.dp)
             )
+            Text(
+                "Für Cover-Scan wird ein vision-fähiges Modell benötigt (z. B. mistral-medium-latest); Tropes-Vorschläge gehen auch mit Text-Modellen.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 4.dp)
+            )
             Button(
                 onClick = {
                     viewModel.saveLlmConfig(LlmConfig(apiKey = apiKey, baseUrl = baseUrl, model = model))

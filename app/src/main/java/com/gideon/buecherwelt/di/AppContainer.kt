@@ -1,6 +1,7 @@
 package com.gideon.buecherwelt.di
 
 import android.content.Context
+import com.gideon.buecherwelt.BuildConfig
 import com.gideon.buecherwelt.data.csv.StoryGraphCsvImporter
 import com.gideon.buecherwelt.data.local.AppDatabase
 import com.gideon.buecherwelt.data.network.BookMetadataFetcher
@@ -34,6 +35,18 @@ class AppContainer(context: Context) {
     }
 
     val okHttpClient: OkHttpClient = OkHttpClient.Builder()
+        .addInterceptor { chain ->
+            val request = chain.request()
+            val apiKey = BuildConfig.GOOGLE_BOOKS_API_KEY
+            val newRequest = if (apiKey.isNotBlank() && request.url.host == "www.googleapis.com") {
+                request.newBuilder()
+                    .url(request.url.newBuilder().addQueryParameter("key", apiKey).build())
+                    .build()
+            } else {
+                request
+            }
+            chain.proceed(newRequest)
+        }
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(25, TimeUnit.SECONDS)
         .writeTimeout(25, TimeUnit.SECONDS)

@@ -16,7 +16,7 @@ private val Context.settingsDataStore: DataStore<Preferences> by
 data class LlmConfig(
     val apiKey: String = "",
     val baseUrl: String = "https://api.mistral.ai/v1",
-    val model: String = "mistral-small-latest"
+    val model: String = "mistral-medium-latest"
 ) {
     val isConfigured: Boolean
         get() = apiKey.isNotBlank() && baseUrl.isNotBlank() && model.isNotBlank()
@@ -39,7 +39,7 @@ class SettingsRepository(context: Context) {
     val llmConfig: Flow<LlmConfig> = combine(
         dataStore.data.map { it[Keys.LLM_API_KEY] ?: "" },
         dataStore.data.map { it[Keys.LLM_BASE_URL] ?: "https://api.mistral.ai/v1" },
-        dataStore.data.map { it[Keys.LLM_MODEL] ?: "mistral-small-latest" }
+        dataStore.data.map { it[Keys.LLM_MODEL] ?: "mistral-medium-latest" }
     ) { apiKey, baseUrl, model ->
         LlmConfig(apiKey = apiKey, baseUrl = baseUrl, model = model)
     }

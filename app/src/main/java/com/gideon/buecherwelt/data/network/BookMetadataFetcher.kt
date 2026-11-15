@@ -97,15 +97,19 @@ class BookMetadataFetcher(
         return metadata
     }
 
-    private suspend fun fetchDnb(isbn: String): BookMetadata? {
+    private suspend fun fetchDnb(isbn: String): BookMetadata? =
+        fetchDnbQuery("isbn=$isbn", fallbackIsbn = isbn)
+
+    private suspend fun fetchDnbQuery(cql: String, fallbackIsbn: String? = null): BookMetadata? {
+        val encoded = java.net.URLEncoder.encode(cql, "UTF-8").replace("+", "%20")
         val url = "https://services.dnb.de/sru/dnb?version=1.1&operation=searchRetrieve" +
-            "&query=isbn%3D$isbn&recordSchema=oai_dc&maximumRecords=1"
+            "&query=$encoded&recordSchema=oai_dc&maximumRecords=5"
         val body = callApi {
             okHttpClient.newCall(Request.Builder().url(url).build()).execute().use { resp ->
                 if (resp.isSuccessful) resp.body?.string() else null
             }
         } ?: return null
-        return parseDnbDc(body, isbn)
+        return parseDnbDc(body, fallbackIsbn)
     }
 
     private fun parseDnbDc(xml: String, isbn: String): BookMetadata? {
@@ -117,10 +121,13 @@ class BookMetadataFetcher(
         var date = ""
         val subjects = mutableListOf<String>()
         var tag = ""
+        var records = 0
+        val isbns = mutableListOf<String>()
         var event = parser.eventType
-        while (event != XmlPullParser.END_DOCUMENT) {
+        while (event != XmlPullParser.END_DOCUMENT && records <= 1) {
             if (event == XmlPullParser.START_TAG) {
                 tag = parser.name.substringAfterLast(':')
+                if (tag == "record") records++
             } else if (event == XmlPullParser.TEXT) {
                 val text = parser.text?.trim().orEmpty()
                 if (text.isNotEmpty()) {
@@ -130,6 +137,10 @@ class BookMetadataFetcher(
                         "publisher" -> if (publisher.isEmpty()) publisher = text
                         "date" -> if (date.isEmpty()) date = text
                         "subject" -> if (subjects.size < 6) subjects += text
+                        "identifier" -> {
+                            val normalized = normalizeIsbn(text)
+                            if (normalized != null && normalized !in isbns) isbns += normalized
+                        }
                     }
                 }
             }
@@ -151,7 +162,7 @@ class BookMetadataFetcher(
             .map { s -> Regex("^[0-9A-Z]{1,3}\\s+(.*)$").find(s)?.groupValues?.get(1) ?: s }
             .distinct()
         return BookMetadata(
-            isbn = isbn,
+            isbn = isbns.firstOrNull { it.length == 13 } ?: isbns.firstOrNull() ?: isbn,
             title = cleanTitle,
             author = cleanAuthor,
             publisher = cleanPublisher,
@@ -207,8 +218,21 @@ class BookMetadataFetcher(
         }
         val results = search(q, 5)
         val best = results.firstOrNull { it.title.isNotBlank() }
-            ?: return FetchResult.NotFound
-        FetchResult.Success(best)
+        if (best != null) return FetchResult.Success(best)
+        val cql = buildString {
+            append("tit=\"${title.trim().replace("\"", "")}\"")
+            if (author.isNotBlank()) append(" and per=\"${author.trim().replace("\"", "")}\"")
+        }
+        val dnb = fetchDnbQuery(cql)
+        if (dnb != null && dnb.title.isNotBlank()) {
+            val isbn = dnb.isbn
+            if (isbn != null) {
+                val byIsbn = fetchByIdentifier(isbn)
+                if (byIsbn is FetchResult.Success) return byIsbn
+            }
+            return FetchResult.Success(dnb)
+        }
+        FetchResult.NotFound
     } catch (e: NoNetworkException) {
         FetchResult.NoNetwork
     } catch (e: Exception) {

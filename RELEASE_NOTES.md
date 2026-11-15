@@ -1,3 +1,16 @@
+# Gideon's Bücherwelt – v1.0.7
+
+Lookup-Zuverlässigkeit und KI-Anbindung verbessert (u. a. für 9783453292819 / „Kingmakers – Jahr 1").
+
+## Fixes
+- **Optionaler Google-Books-API-Key**: Secret `GOOGLE_BOOKS_API_KEY` wird per CI in `BuildConfig` gebaut und als `key`-Parameter an googleapis.com angehängt (ohne Key bleibt das bisherige Verhalten). Behebt „nichts gefunden", wenn das anonyme Kontingent (429) am Gerät erschöpft ist
+- **DNB-Titelsuche als Fallback**: Titel/Autor-Suche (z. B. nach Cover-Scan per OCR/LLM) fällt auf die DNB-SRU-Suche (`tit=… and per=…`) zurück; erkannte ISBN aus DNB-Identifikatoren wird für die volle Metadaten-Kette verwendet
+- **LLM-Default-Modell jetzt vision-fähig**: `mistral-medium-latest` statt `mistral-small-latest` (das alte Default konnte keine Bilder auswerten → Cover-Scan per KI schlug fehl); Hinweis in den Einstellungen
+
+**Full Changelog**: https://github.com/gschmalzhaf-cell/Gideon-s-B-cherwelt/commits/v1.0.7
+
+---
+
 # Gideon's Bücherwelt – v1.0.6
 
 Cover-Scan als Recherche-Alternative, wenn die ISBN nichts bringt.
