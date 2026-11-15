@@ -1,3 +1,16 @@
+# Gideon's Bücherwelt – v1.0.5
+
+ISBN-Lookup deutlich robuster (z. B. gescannte ISBN 9783453292819, die weder Google Books noch Open Library direkt lieferten).
+
+## Fixes
+- **Fallback-Kette pro ISBN**: ISBN-13 ↔ ISBN-10 (Prüfziffer wird konvertiert), Google Books `isbn:`, Open Library `/isbn/…` **und** OL-Suche `isbn:`, als letzte Quelle **Deutsche Nationalbibliothek (SRU/oai_dc)** — besonders für deutschsprachige Bücher zuverlässig
+- DNB-Metadaten (Titel, Autor:in, Verlag, Jahr, DDC-Sachgruppen) werden geparst und als Fallback gemerged
+- Google Books ohne API-Key (429/Rate-Limit) wird sauber abgefangen und fällt nicht mehr auf „nichts gefunden" zurück
+
+**Full Changelog**: https://github.com/gschmalzhaf-cell/Gideon-s-B-cherwelt/commits/v1.0.5
+
+---
+
 # Gideon's Bücherwelt – v1.0.4
 
 Weitere Design-Nachbesserung Richtung Google Stitch (alle Screens).

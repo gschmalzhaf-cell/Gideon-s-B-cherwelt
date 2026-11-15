@@ -57,7 +57,7 @@ class AppContainer(context: Context) {
 
     val settingsRepository = SettingsRepository(appContext)
     val coverCache = CoverCache(appContext, okHttpClient)
-    val metadataFetcher = BookMetadataFetcher(googleBooksApi, openLibraryApi)
+    val metadataFetcher = BookMetadataFetcher(googleBooksApi, openLibraryApi, okHttpClient)
 
     val bookRepository = BookRepository(bookDao, tropeDao)
     val tropeRepository = TropeRepository(tropeDao)

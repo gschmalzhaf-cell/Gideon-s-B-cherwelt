@@ -1,11 +1,17 @@
 package com.gideon.buecherwelt.data.network
 
+import android.util.Xml
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import org.xmlpull.v1.XmlPullParser
 import retrofit2.HttpException
 import java.io.IOException
+import java.io.StringReader
 
 class BookMetadataFetcher(
     private val googleBooksApi: GoogleBooksApi,
-    private val openLibraryApi: OpenLibraryApi
+    private val openLibraryApi: OpenLibraryApi,
+    private val okHttpClient: OkHttpClient
 ) {
 
     suspend fun fetchByIdentifier(raw: String): FetchResult {
@@ -35,14 +41,123 @@ class BookMetadataFetcher(
     suspend fun fetchByIsbn(rawIsbn: String): FetchResult = fetchByIdentifier(rawIsbn)
 
     private suspend fun fetchIsbnMetadata(isbn: String): BookMetadata? {
-        val gb = callApi { googleBooksApi.searchByIsbn("isbn:$isbn").items.firstOrNull()?.volumeInfo }
-        val ol = callApi { openLibraryApi.getByIsbn(isbn) }
-        val olAuthors = ol?.authors.orEmpty().mapNotNull { ref ->
-            ref.key?.substringAfterLast('/')?.let { key ->
-                callApi { openLibraryApi.getAuthor(key)?.name }
+        val variants = isbnVariants(isbn)
+        var gb: GbVolumeInfo? = null
+        var ol: OlBook? = null
+        var olAuthors: List<String> = emptyList()
+        var olSearch: BookMetadata? = null
+        for (v in variants) {
+            if (gb == null) {
+                gb = callApi { googleBooksApi.searchByIsbn("isbn:$v").items.firstOrNull()?.volumeInfo }
+            }
+            if (ol == null) {
+                ol = callApi { openLibraryApi.getByIsbn(v) }
+                if (ol != null) {
+                    olAuthors = ol!!.authors.orEmpty().mapNotNull { ref ->
+                        ref.key?.substringAfterLast('/')?.let { key ->
+                            callApi { openLibraryApi.getAuthor(key)?.name }
+                        }
+                    }
+                }
+            }
+            if (ol == null && olSearch == null) {
+                val doc = olSearchFirst("isbn:$v")
+                if (doc != null && !doc.title.isNullOrBlank()) olSearch = doc.toMetadata()
+            }
+            if (gb != null && (ol != null || olSearch != null)) break
+        }
+        var metadata = merge(isbn = isbn, gb = gb, ol = ol, olAuthors = olAuthors)
+        if (metadata.title.isBlank() && olSearch != null) {
+            val s = olSearch!!
+            metadata = metadata.copy(
+                title = s.title,
+                author = metadata.author.ifBlank { s.author },
+                publisher = metadata.publisher.ifBlank { s.publisher },
+                publishedYear = metadata.publishedYear ?: s.publishedYear,
+                categories = metadata.categories.ifEmpty { s.categories },
+                coverUrl = metadata.coverUrl ?: s.coverUrl
+            )
+        }
+        if (metadata.title.isBlank()) {
+            for (v in variants) {
+                val dnb = fetchDnb(v)
+                if (dnb != null && dnb.title.isNotBlank()) {
+                    metadata = metadata.copy(
+                        title = dnb.title,
+                        author = metadata.author.ifBlank { dnb.author },
+                        publisher = metadata.publisher.ifBlank { dnb.publisher },
+                        publishedYear = metadata.publishedYear ?: dnb.publishedYear,
+                        categories = metadata.categories.ifEmpty { dnb.categories },
+                        description = metadata.description.ifBlank { dnb.description }
+                    )
+                    break
+                }
             }
         }
-        return merge(isbn = isbn, gb = gb, ol = ol, olAuthors = olAuthors)
+        return metadata
+    }
+
+    private suspend fun fetchDnb(isbn: String): BookMetadata? {
+        val url = "https://services.dnb.de/sru/dnb?version=1.1&operation=searchRetrieve" +
+            "&query=isbn%3D$isbn&recordSchema=oai_dc&maximumRecords=1"
+        val body = callApi {
+            okHttpClient.newCall(Request.Builder().url(url).build()).execute().use { resp ->
+                if (resp.isSuccessful) resp.body?.string() else null
+            }
+        } ?: return null
+        return parseDnbDc(body, isbn)
+    }
+
+    private fun parseDnbDc(xml: String, isbn: String): BookMetadata? {
+        val parser = Xml.newPullParser()
+        parser.setInput(StringReader(xml))
+        var title = ""
+        var creator = ""
+        var publisher = ""
+        var date = ""
+        val subjects = mutableListOf<String>()
+        var tag = ""
+        var event = parser.eventType
+        while (event != XmlPullParser.END_DOCUMENT) {
+            if (event == XmlPullParser.START_TAG) {
+                tag = parser.name.substringAfterLast(':')
+            } else if (event == XmlPullParser.TEXT) {
+                val text = parser.text?.trim().orEmpty()
+                if (text.isNotEmpty()) {
+                    when (tag) {
+                        "title" -> if (title.isEmpty()) title = text
+                        "creator" -> if (creator.isEmpty()) creator = text
+                        "publisher" -> if (publisher.isEmpty()) publisher = text
+                        "date" -> if (date.isEmpty()) date = text
+                        "subject" -> if (subjects.size < 6) subjects += text
+                    }
+                }
+            }
+            event = parser.next()
+        }
+        if (title.isEmpty()) return null
+        val cleanTitle = title
+            .replace(Regex("^\\[[^\\]]*\\]\\s*;\\s*"), "")
+            .substringBefore(" / ")
+            .substringBefore(" : ")
+            .trim()
+        val cleanAuthor = creator
+            .replace(Regex("\\s*\\[[^\\]]*\\]$"), "")
+            .let { c -> if (", " in c) c.split(", ", limit = 2).let { (l, f) -> "$f $l" } else c }
+            .trim()
+        val cleanPublisher = publisher.substringAfterLast(": ").trim()
+        val year = Regex("\\d{4}").find(date)?.value?.toIntOrNull()
+        val categories = subjects
+            .map { s -> Regex("^[0-9A-Z]{1,3}\\s+(.*)$").find(s)?.groupValues?.get(1) ?: s }
+            .distinct()
+        return BookMetadata(
+            isbn = isbn,
+            title = cleanTitle,
+            author = cleanAuthor,
+            publisher = cleanPublisher,
+            publishedYear = year,
+            categories = categories
+        )
     }
 
     private suspend fun olSearchFirst(query: String): OlDoc? =
@@ -166,6 +281,22 @@ class BookMetadataFetcher(
             }
             if (cleaned.all { it.isDigit() } && cleaned.length in 5..12) {
                 result += IdentifierKind.GOODREADS to cleaned
+            }
+            return result
+        }
+
+        fun isbnVariants(isbn: String): List<String> {
+            val result = mutableListOf(isbn)
+            if (isbn.length == 13 && isbn.startsWith("978")) {
+                val core = isbn.substring(3, 12)
+                val sum = core.mapIndexed { i, c -> c.digitToInt() * (10 - i) }.sum()
+                val check = (11 - sum % 11) % 11
+                result += core + (if (check == 10) "X" else check.toString())
+            } else if (isbn.length == 10) {
+                val core = isbn.take(9)
+                val sum = core.mapIndexed { i, c -> c.digitToInt() * (1 + 2 * i) }.sum()
+                val check = (10 - sum % 10) % 10
+                result += "978$core$check"
             }
             return result
         }
