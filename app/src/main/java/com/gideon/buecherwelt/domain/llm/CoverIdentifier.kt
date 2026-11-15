@@ -17,7 +17,6 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.serialization.json.parseToJsonElement
 import java.io.ByteArrayOutputStream
 import java.io.File
 import kotlin.coroutines.resume
@@ -66,8 +65,10 @@ class CoverIdentifier(
             FetchResult.NotFound
         }
 
+    private val json = Json { ignoreUnknownKeys = true }
+
     private fun parseCoverJson(raw: String): CoverIdentification? = try {
-        val obj = Json.parseToJsonElement(raw).jsonObject
+        val obj = json.parseToJsonElement(raw).jsonObject
         CoverIdentification(
             title = obj["title"]?.jsonPrimitive?.content?.trim().orEmpty(),
             author = obj["author"]?.jsonPrimitive?.content?.trim().orEmpty(),
