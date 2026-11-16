@@ -20,6 +20,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -49,6 +50,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.ui.text.font.FontWeight
@@ -58,6 +60,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.gideon.buecherwelt.di.AppContainer
 import com.gideon.buecherwelt.domain.recommendation.ScoredCandidate
+import com.gideon.buecherwelt.ui.components.AppTextField
 import com.gideon.buecherwelt.ui.components.BookCover
 import com.gideon.buecherwelt.ui.components.InfoRow
 import com.gideon.buecherwelt.ui.components.SectionHeader
@@ -92,7 +95,10 @@ fun BookDetailScreen(
     val llmConfigured by viewModel.llmConfigured.collectAsStateWithLifecycle()
     val insightsLoading by viewModel.insightsLoading.collectAsStateWithLifecycle()
     val insightsError by viewModel.insightsError.collectAsStateWithLifecycle()
+    val seriesBooks by viewModel.seriesBooks.collectAsStateWithLifecycle()
+    val seriesNames by viewModel.seriesNames.collectAsStateWithLifecycle()
     var showDeleteDialog by remember { mutableStateOf(false) }
+    var showSeriesDialog by remember { mutableStateOf(false) }
     var similarRequested by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -202,6 +208,84 @@ fun BookDetailScreen(
                         InfoRow("Genre", current.genre)
                         InfoRow("Subgenre", current.subgenre)
                     }
+                }
+            }
+            item {
+                val seriesAll = listOf(current) + seriesBooks
+                SectionHeader(if (current.seriesName.isNotBlank()) "Serie: ${current.seriesName}" else "Serie")
+                if (current.seriesName.isNotBlank()) {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = MaterialTheme.shapes.large,
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            if (current.seriesIndex != null) {
+                                InfoRow("Band in der Serie", "Nr. ${current.seriesIndex}")
+                            }
+                            val seriesGenres = seriesAll.map { it.genre }.filter { it.isNotBlank() }.distinct()
+                            if (seriesGenres.isNotEmpty()) {
+                                Text("Genres in der Serie", style = MaterialTheme.typography.labelMedium)
+                                FlowRow(
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    seriesGenres.forEach { genre ->
+                                        FilterChip(
+                                            selected = true,
+                                            onClick = {},
+                                            label = { Text(genre) },
+                                            shape = CircleShape,
+                                            colors = FilterChipDefaults.filterChipColors(
+                                                selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                                                selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer
+                                            )
+                                        )
+                                    }
+                                }
+                            }
+                            val seriesTropes = seriesAll.flatMap { b -> b.tropes.map { t -> t.name } }.distinct()
+                            if (seriesTropes.isNotEmpty()) {
+                                Text("Tropes in der Serie", style = MaterialTheme.typography.labelMedium)
+                                FlowRow(
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    seriesTropes.forEach { trope ->
+                                        FilterChip(
+                                            selected = true,
+                                            onClick = {},
+                                            label = { Text(trope) },
+                                            shape = CircleShape,
+                                            colors = FilterChipDefaults.filterChipColors(
+                                                selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                                                selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer
+                                            )
+                                        )
+                                    }
+                                }
+                            }
+                            if (seriesBooks.isNotEmpty()) {
+                                Text("Weitere Bände / Fortsetzungen", style = MaterialTheme.typography.labelMedium)
+                                seriesBooks.forEach { other ->
+                                    SeriesBookRow(
+                                        book = other,
+                                        onClick = { navController.navigate(Screen.BookDetail.create(other.id)) }
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+                Spacer(Modifier.height(8.dp))
+                OutlinedButton(onClick = { showSeriesDialog = true }) {
+                    Icon(Icons.Default.Edit, contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text(if (current.seriesName.isBlank()) "Serie verknüpfen" else "Serie ändern")
                 }
             }
             if (current.tropes.isNotEmpty()) {
@@ -340,6 +424,61 @@ fun BookDetailScreen(
         }
     }
 
+    if (showSeriesDialog) {
+        var name by remember { mutableStateOf(book?.seriesName ?: "") }
+        var indexText by remember { mutableStateOf(book?.seriesIndex?.toString() ?: "") }
+        AlertDialog(
+            onDismissRequest = { showSeriesDialog = false },
+            title = { Text("Serie verknüpfen") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    AppTextField(
+                        value = name,
+                        onValueChange = { name = it },
+                        label = { Text("Serienname") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    val others = seriesNames.filter { it != (book?.seriesName ?: "") }
+                    if (others.isNotEmpty()) {
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            others.forEach { series ->
+                                AssistChip(onClick = { name = series }, label = { Text(series) })
+                            }
+                        }
+                    }
+                    AppTextField(
+                        value = indexText,
+                        onValueChange = { indexText = it.filter { c -> c.isDigit() }.take(3) },
+                        label = { Text("Band / Nr. in der Serie") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    showSeriesDialog = false
+                    viewModel.setSeries(name, indexText.trim().toIntOrNull())
+                }) { Text("Übernehmen") }
+            },
+            dismissButton = {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (!book?.seriesName.isNullOrBlank()) {
+                        TextButton(onClick = {
+                            showSeriesDialog = false
+                            viewModel.setSeries("", null)
+                        }) { Text("Aus Serie entfernen") }
+                    }
+                    TextButton(onClick = { showSeriesDialog = false }) { Text("Abbrechen") }
+                }
+            }
+        )
+    }
+
     if (showDeleteDialog) {
         AlertDialog(
             onDismissRequest = { showDeleteDialog = false },
@@ -355,6 +494,53 @@ fun BookDetailScreen(
                 TextButton(onClick = { showDeleteDialog = false }) { Text("Abbrechen") }
             }
         )
+    }
+}
+
+@Composable
+private fun SeriesBookRow(
+    book: com.gideon.buecherwelt.domain.model.Book,
+    onClick: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp)
+            .clickable(onClick = onClick),
+        shape = MaterialTheme.shapes.large,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)
+    ) {
+        Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+            BookCover(
+                coverPath = book.coverPath,
+                coverUrl = book.coverUrl,
+                contentDescription = book.title,
+                modifier = Modifier
+                    .width(40.dp)
+                    .aspectRatio(2f / 3f)
+            )
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(horizontal = 12.dp)
+            ) {
+                Text(book.title, style = MaterialTheme.typography.bodyMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                val meta = buildList {
+                    if (book.seriesIndex != null) add("Nr. ${book.seriesIndex}")
+                    if (book.publishedYear != null) add(book.publishedYear.toString())
+                    if (book.author.isNotBlank()) add(book.author)
+                }.joinToString(" · ")
+                if (meta.isNotBlank()) {
+                    Text(
+                        meta,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Spacer(Modifier.height(4.dp))
+                StatusChip(status = book.status)
+            }
+        }
     }
 }
 

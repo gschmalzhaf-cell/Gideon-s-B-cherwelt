@@ -26,6 +26,20 @@ class BookRepository(
 
     suspend fun getAllBooks(): List<Book> = bookDao.getAllBooks().map { it.toDomain() }
 
+    fun observeSeriesNames(): Flow<List<String>> =
+        observeBooks().map { all ->
+            all.map { it.seriesName }
+                .filter { it.isNotBlank() }
+                .distinct()
+                .sortedBy { it.lowercase() }
+        }
+
+    suspend fun seriesNames(): List<String> =
+        getAllBooks().map { it.seriesName }
+            .filter { it.isNotBlank() }
+            .distinct()
+            .sortedBy { it.lowercase() }
+
     suspend fun findByIsbn(isbn: String): Book? =
         bookDao.findByIsbn(isbn)?.let { BookWithTropes(it).toDomain() }
 
@@ -79,6 +93,8 @@ class BookRepository(
             rating = existing.rating ?: incoming.rating,
             status = if (existing.status == ReadingStatus.PLANNED) incoming.status else existing.status,
             notes = existing.notes.ifBlank { incoming.notes },
+            seriesName = if (existing.seriesName.isBlank()) incoming.seriesName else existing.seriesName,
+            seriesIndex = existing.seriesIndex ?: incoming.seriesIndex,
             updatedAt = System.currentTimeMillis()
         )
         val tropeIds = (existing.tropes.map { it.id } + newTropeIds).toSet()
@@ -102,6 +118,8 @@ class BookRepository(
         rating = book.rating,
         status = ReadingStatus.fromString(book.status),
         notes = book.notes,
+        seriesName = book.seriesName,
+        seriesIndex = book.seriesIndex,
         aiSummary = book.aiSummary,
         aiFitScore = book.aiFitScore,
         aiFitReason = book.aiFitReason,
@@ -127,6 +145,8 @@ class BookRepository(
         rating = rating,
         status = status.name,
         notes = notes,
+        seriesName = seriesName,
+        seriesIndex = seriesIndex,
         aiSummary = aiSummary,
         aiFitScore = aiFitScore,
         aiFitReason = aiFitReason,

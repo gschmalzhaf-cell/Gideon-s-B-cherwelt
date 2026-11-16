@@ -25,6 +25,8 @@ data class Book(
     val rating: Int? = null,
     val status: ReadingStatus = ReadingStatus.PLANNED,
     val notes: String = "",
+    val seriesName: String = "",
+    val seriesIndex: Int? = null,
     val aiSummary: String? = null,
     val aiFitScore: Int? = null,
     val aiFitReason: String? = null,

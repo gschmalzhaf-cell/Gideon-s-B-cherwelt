@@ -23,9 +23,13 @@ optionale LLM-Aufrufe (z. B. Mistral) genutzt.
    Duplikate (ISBN oder Titel+Autor) werden erkannt und können zusammengeführt werden.
 2. **Metadaten & Tags** – editierbarer Tropes-Katalog (Autovervollständigung, Mehrfachauswahl,
    eigene Tropes), Bewertung 1–5, Lesestatus (geplant/lesend/gelesen/abgebrochen),
-   Spice-Level 0–5, Genre/Subgenre, Notizen. **LLM-Trope-Vorschläge** als anklickbare Chips
+   Spice-Level 0–5, Genre/Subgenre, Notizen, **Serie/Reihe + Band-Nr.** (mit Vorschlägen
+   bestehender Serien). **LLM-Trope-Vorschläge** als anklickbare Chips
    (nur nach Bestätigung übernommen). **StoryGraph-CSV-Import** (Titel, Autor:in, Status,
-   Tags; Buchdaten per ISBN nachladen).
+   Tags; Buchdaten per ISBN nachladen). Beim Bearbeiten kann das **Cover direkt ersetzt** werden
+   („Cover ändern“ per Galerie). Auf der **Buchdetailseite** zeigt ein eigener Serie-Abschnitt
+   alle weiteren Bände (klickbar) plus die kombinierten Genres/Tropes der ganzen Serie –
+   direkt vor Ort verknüpfbar/änderbar.
 3. **Statistik** – Dashboard mit Top-Genres, Top-Tropes, Lieblingsautor:innen/-verlagen,
    Ø Spice-Level, Ø Bewertung, Genre-Verteilung, Status-Übersicht, Lieblingsbüchern **und
    „Weniger beliebt"** (Abbrüche + 1-2-Sterne-Bewertungen als negative Signale). Wird

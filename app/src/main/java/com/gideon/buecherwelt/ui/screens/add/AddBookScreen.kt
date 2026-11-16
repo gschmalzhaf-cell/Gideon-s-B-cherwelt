@@ -3,6 +3,8 @@ package com.gideon.buecherwelt.ui.screens.add
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -15,11 +17,13 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
@@ -45,6 +49,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -52,6 +57,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import com.gideon.buecherwelt.data.network.CoverCache
+import kotlinx.coroutines.launch
 import java.io.File
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -68,7 +75,7 @@ import com.gideon.buecherwelt.ui.components.TropePicker
 import com.gideon.buecherwelt.ui.navigation.Screen
 import com.gideon.buecherwelt.ui.viewModelFactory
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun AddBookScreen(
     container: AppContainer,
@@ -106,6 +113,10 @@ fun AddBookScreen(
     var status by remember(formInit) { mutableStateOf(formInit?.status ?: ReadingStatus.PLANNED) }
     var spice by remember(formInit) { mutableIntStateOf(formInit?.spice ?: 0) }
     var notes by remember(formInit) { mutableStateOf(formInit?.notes ?: "") }
+    var seriesName by remember(formInit) { mutableStateOf(formInit?.seriesName ?: "") }
+    var seriesIndexText by remember(formInit) { mutableStateOf(formInit?.seriesIndex?.toString() ?: "") }
+    var coverUrl by remember(formInit) { mutableStateOf(formInit?.coverUrl) }
+    var coverPath by remember(formInit) { mutableStateOf(formInit?.coverPath) }
     var selectedTropes by remember(formInit) { mutableStateOf(formInit?.tropes ?: emptySet()) }
     var selectedGenreSuggestions by remember(formInit) { mutableStateOf(emptySet<String>()) }
     var saveResult by remember { mutableStateOf<SaveResult?>(null) }
@@ -121,7 +132,23 @@ fun AddBookScreen(
     }
 
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     var showCoverDialog by remember { mutableStateOf(false) }
+    val coverPickerLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        uri?.let {
+            scope.launch {
+                val path = container.coverCache.savePicked(
+                    context.contentResolver,
+                    it,
+                    CoverCache.keyFor(formInit?.isbn, title.ifBlank { "manual" }, author)
+                )
+                if (path != null) {
+                    coverPath = path
+                    coverUrl = null
+                }
+            }
+        }
+    }
     val galleryLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         uri?.let {
             try {
@@ -156,6 +183,8 @@ fun AddBookScreen(
         rating = if (rating == 0) null else rating,
         status = status,
         notes = notes,
+        seriesName = seriesName,
+        seriesIndex = seriesIndexText.trim().toIntOrNull(),
         selectedTropes = selectedTropes
     )
 
@@ -164,8 +193,8 @@ fun AddBookScreen(
         viewModel.save(
             form = pendingForm!!,
             isbn = formInit?.isbn ?: isbn.ifBlank { null },
-            coverUrl = formInit?.coverUrl,
-            coverPath = formInit?.coverPath
+            coverUrl = coverUrl,
+            coverPath = coverPath
         ) { result -> saveResult = result }
     }
 
@@ -255,21 +284,21 @@ fun AddBookScreen(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Box(modifier = Modifier.width(84.dp)) {
                         BookCover(
-                            coverPath = init.coverPath,
-                            coverUrl = init.coverUrl,
+                            coverPath = coverPath,
+                            coverUrl = coverUrl,
                             contentDescription = init.title,
                             modifier = Modifier.fillMaxWidth()
                         )
                     }
                     Column(modifier = Modifier.padding(start = 12.dp)) {
                         Text("Cover", style = MaterialTheme.typography.labelMedium)
-                        if (init.coverPath != null) {
+                        if (coverPath != null) {
                             Text(
                                 "lokal gecacht (offline verfügbar)",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
-                        } else if (init.coverUrl != null) {
+                        } else if (coverUrl != null) {
                             Text(
                                 "Remote-Cover",
                                 style = MaterialTheme.typography.bodySmall,
@@ -281,6 +310,14 @@ fun AddBookScreen(
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
+                        }
+                        if (editBookId != null) {
+                            Spacer(Modifier.height(4.dp))
+                            OutlinedButton(onClick = { coverPickerLauncher.launch("image/*") }) {
+                                Icon(Icons.Default.Image, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(Modifier.width(6.dp))
+                                Text("Cover ändern")
+                            }
                         }
                     }
                 }
@@ -298,6 +335,34 @@ fun AddBookScreen(
             )
             AppTextField(value = genre, onValueChange = { genre = it }, label = { Text("Genre") }, modifier = Modifier.fillMaxWidth())
             AppTextField(value = subgenre, onValueChange = { subgenre = it }, label = { Text("Subgenre") }, modifier = Modifier.fillMaxWidth())
+            AppTextField(
+                value = seriesName,
+                onValueChange = { seriesName = it },
+                label = { Text("Serie / Reihe (z. B. „Fourth-Wing-Reihe“)") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth()
+            )
+            if (state.seriesNames.isNotEmpty()) {
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                    modifier = Modifier.padding(top = 4.dp)
+                ) {
+                    state.seriesNames.forEach { name ->
+                        AssistChip(
+                            onClick = { seriesName = name },
+                            label = { Text(name) }
+                        )
+                    }
+                }
+            }
+            AppTextField(
+                value = seriesIndexText,
+                onValueChange = { seriesIndexText = it.filter { c -> c.isDigit() }.take(3) },
+                label = { Text("Band / Nr. in der Serie") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth()
+            )
             AppTextField(
                 value = description,
                 onValueChange = { description = it },
@@ -445,8 +510,8 @@ fun AddBookScreen(
                                 existing = result.existing,
                                 form = form,
                                 isbn = formInit?.isbn ?: isbn.ifBlank { null },
-                                coverUrl = formInit?.coverUrl,
-                                coverPath = formInit?.coverPath
+                                coverUrl = coverUrl,
+                                coverPath = coverPath
                             ) { r -> saveResult = r }
                         }
                     }) { Text("Zusammenführen") }

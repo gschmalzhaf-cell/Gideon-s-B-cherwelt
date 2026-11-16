@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -28,6 +29,36 @@ class BookDetailViewModel(
 
     val book: StateFlow<Book?> = bookRepository.observeBook(bookId)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+
+    val seriesBooks: StateFlow<List<Book>> = combine(book, bookRepository.observeBooks()) { current, all ->
+        if (current == null || current.seriesName.isBlank()) {
+            emptyList()
+        } else {
+            all.filter { it.id != current.id && it.seriesName.equals(current.seriesName, ignoreCase = true) }
+                .sortedWith(
+                    compareBy(
+                        { it.seriesIndex ?: Int.MAX_VALUE },
+                        { it.publishedYear ?: Int.MAX_VALUE },
+                        { it.title.lowercase() }
+                    )
+                )
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val seriesNames: StateFlow<List<String>> = bookRepository.observeSeriesNames()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    fun setSeries(name: String, index: Int?) {
+        viewModelScope.launch {
+            val current = book.value ?: return@launch
+            val updated = current.copy(
+                seriesName = name.trim(),
+                seriesIndex = index,
+                updatedAt = System.currentTimeMillis()
+            )
+            bookRepository.update(updated, current.tropes.map { it.id }.toSet())
+        }
+    }
 
     private val _llmConfigured = MutableStateFlow(false)
     val llmConfigured: StateFlow<Boolean> = _llmConfigured.asStateFlow()

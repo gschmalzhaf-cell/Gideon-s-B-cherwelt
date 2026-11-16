@@ -35,6 +35,8 @@ data class FormInit(
     val rating: Int? = null,
     val status: ReadingStatus = ReadingStatus.PLANNED,
     val notes: String = "",
+    val seriesName: String = "",
+    val seriesIndex: Int? = null,
     val tropes: Set<String> = emptySet(),
     val coverUrl: String? = null,
     val coverPath: String? = null
@@ -52,6 +54,8 @@ data class BookForm(
     val rating: Int?,
     val status: ReadingStatus,
     val notes: String,
+    val seriesName: String,
+    val seriesIndex: Int?,
     val selectedTropes: Set<String>
 )
 
@@ -70,7 +74,8 @@ data class AddBookUiState(
     val suggestionLoading: Boolean = false,
     val llmConfigured: Boolean = false,
     val saving: Boolean = false,
-    val editBookId: Long? = null
+    val editBookId: Long? = null,
+    val seriesNames: List<String> = emptyList()
 )
 
 class AddBookViewModel(
@@ -101,6 +106,11 @@ class AddBookViewModel(
                 _state.update { it.copy(allTropes = tropes) }
             }
         }
+        viewModelScope.launch {
+            bookRepository.observeSeriesNames().collect { names ->
+                _state.update { it.copy(seriesNames = names) }
+            }
+        }
         if (editBookId != null) {
             viewModelScope.launch { loadForEdit(editBookId) }
         }
@@ -123,6 +133,8 @@ class AddBookViewModel(
                     rating = book.rating,
                     status = book.status,
                     notes = book.notes,
+                    seriesName = book.seriesName,
+                    seriesIndex = book.seriesIndex,
                     tropes = book.tropes.map { t -> t.name }.toSet(),
                     coverUrl = book.coverUrl,
                     coverPath = book.coverPath
@@ -263,6 +275,8 @@ class AddBookViewModel(
                 rating = form.rating,
                 status = form.status,
                 notes = form.notes.trim(),
+                seriesName = form.seriesName.trim(),
+                seriesIndex = form.seriesIndex,
                 tropes = emptyList(),
                 createdAt = now,
                 updatedAt = now
@@ -320,7 +334,9 @@ class AddBookViewModel(
                 spiceLevel = form.spice,
                 rating = form.rating,
                 status = form.status,
-                notes = form.notes.trim()
+                notes = form.notes.trim(),
+                seriesName = form.seriesName.trim(),
+                seriesIndex = form.seriesIndex
             )
             val tropeIds = tropeRepository.resolveIds(form.selectedTropes)
             val merged = bookRepository.merge(existing, incoming, tropeIds)

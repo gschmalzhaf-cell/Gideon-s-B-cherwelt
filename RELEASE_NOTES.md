@@ -1,3 +1,19 @@
+# Gideon's Bücherwelt – v1.2.0
+
+Detailseite ausgebaut: Serien/Fortsetzungen und direktes Aktualisieren der Buchdaten.
+
+## Neu
+- **Serien & Fortsetzungen**: Bücher lassen sich einer Serie zuordnen (Serienname + Band-Nr.). Auf der Buchdetailseite gibt es einen eigenen „Serie“-Abschnitt mit allen weiteren Bänden (klickbar), den kombinierten Genres und Tropes der ganzen Serie sowie „Serie verknüpfen/ändern“ direkt vor Ort (inkl. Vorschlägen bestehender Serien und „Aus Serie entfernen")
+- **Buch bearbeiten erweitert**: Serie/Reihe + Band-Nr. als Felder mit Autocomplete-Chips; **Cover direkt ersetzen** („Cover ändern“ per Galerie) im Bearbeiten-Screen; alle übrigen Felder (Titel, Autor:in, Verlag, Erscheinungsjahr, Genre, Beschreibung, Bewertung, Status, Spice, Tropes, Notizen) wie gehabt
+- Design bleibt am Stitch-Design-System ausgerichtet (Cards, Pill-Chips, SectionHeader)
+
+## Technisch
+- Room-Datenbank v2 → v3 (Migration: `seriesName`, `seriesIndex` in `books`)
+
+**Full Changelog**: https://github.com/gschmalzhaf-cell/Gideon-s-B-cherwelt/commits/v1.2.0
+
+---
+
 # Gideon's Bücherwelt – v1.1.0
 
 Die App lernt jetzt aus negativen Signalen und nutzt das LLM gezielter.
