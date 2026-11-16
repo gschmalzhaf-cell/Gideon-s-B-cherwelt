@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -15,8 +16,11 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
@@ -36,6 +40,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.gideon.buecherwelt.di.AppContainer
+import com.gideon.buecherwelt.ui.components.AppTextField
 import com.gideon.buecherwelt.ui.components.BookCard
 import com.gideon.buecherwelt.ui.components.EmptyState
 import com.gideon.buecherwelt.ui.components.FilterBar
@@ -50,7 +55,12 @@ fun LibraryScreen(
 ) {
     val viewModel: LibraryViewModel = viewModel(
         factory = viewModelFactory {
-            LibraryViewModel(container.bookRepository, container.tropeRepository)
+            LibraryViewModel(
+                container.bookRepository,
+                container.tropeRepository,
+                container.llmService,
+                container.settingsRepository
+            )
         }
     )
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -116,11 +126,66 @@ fun LibraryScreen(
                 onTropeChange = viewModel::setTrope,
                 modifier = Modifier.padding(top = 12.dp)
             )
+            if (state.llmConfigured) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .padding(top = 8.dp)
+                        .fillMaxWidth()
+                ) {
+                    AppTextField(
+                        value = state.semanticQuery,
+                        onValueChange = viewModel::setSemanticQuery,
+                        placeholder = { Text("KI-Suche, z. B. „düstere Bücher mit Happy End“") },
+                        leadingIcon = { Icon(Icons.Default.AutoAwesome, contentDescription = null) },
+                        trailingIcon = if (state.semanticActive) {
+                            {
+                                IconButton(onClick = viewModel::clearSemantic) {
+                                    Icon(Icons.Default.Close, contentDescription = "KI-Suche zurücksetzen")
+                                }
+                            }
+                        } else null,
+                        singleLine = true,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    IconButton(
+                        onClick = viewModel::runSemanticSearch,
+                        enabled = !state.semanticLoading && state.semanticQuery.isNotBlank()
+                    ) {
+                        if (state.semanticLoading) {
+                            CircularProgressIndicator(modifier = Modifier.size(20.dp))
+                        } else {
+                            Icon(Icons.Default.AutoAwesome, contentDescription = "KI-Suche starten")
+                        }
+                    }
+                }
+                if (state.semanticActive && state.semanticExplanation != null) {
+                    Text(
+                        text = state.semanticExplanation!!,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(top = 4.dp)
+                    )
+                }
+                if (state.semanticError != null) {
+                    Text(
+                        text = state.semanticError!!,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.padding(top = 4.dp)
+                    )
+                }
+            }
             val filtered = state.filtered
             if (filtered.isEmpty()) {
                 EmptyState(
                     title = "Keine Bücher gefunden",
-                    subtitle = "Füge dein erstes Buch per ISBN-Scan oder manuell über das + hinzu.",
+                    subtitle = if (state.semanticActive) {
+                        "Die KI-Suche hat keine passenden Bücher gefunden – Frage oder Filter anpassen."
+                    } else {
+                        "Füge dein erstes Buch per ISBN-Scan oder manuell über das + hinzu."
+                    },
                     modifier = Modifier.fillMaxSize()
                 )
             } else {

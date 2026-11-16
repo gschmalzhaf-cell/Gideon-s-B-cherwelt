@@ -30,6 +30,7 @@ data class DiscoverUiState(
     val ruleLoading: Boolean = false,
     val llmLoading: Boolean = false,
     val llmConfigured: Boolean = false,
+    val reranked: Boolean = false,
     val error: String? = null,
     val message: String? = null
 )
@@ -79,11 +80,22 @@ class DiscoverViewModel(
             }.toSet()
             val profile = ReadingStatsCalculator.compute(all)
             val candidates = recommendationEngine.candidatesForProfile(profile, exclude)
+            var finalCandidates = candidates
+            var reranked = false
+            if (llmConfig.isConfigured && candidates.isNotEmpty()) {
+                val top = candidates.take(12)
+                val ranked = llmService.rerankCandidates(llmConfig, profile, top)
+                if (ranked != null) {
+                    finalCandidates = ranked + candidates.drop(top.size)
+                    reranked = true
+                }
+            }
             _state.update {
                 it.copy(
                     ruleLoading = false,
-                    ruleCandidates = candidates,
-                    error = if (candidates.isEmpty()) {
+                    ruleCandidates = finalCandidates,
+                    reranked = reranked,
+                    error = if (finalCandidates.isEmpty()) {
                         "Keine Empfehlungen gefunden (offline oder keine Treffer)."
                     } else null
                 )

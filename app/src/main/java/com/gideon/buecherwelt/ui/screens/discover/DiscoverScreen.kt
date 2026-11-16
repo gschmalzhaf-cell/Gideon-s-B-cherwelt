@@ -114,7 +114,8 @@ fun DiscoverScreen(
             item {
                 Text(
                     "Basierend auf ${state.profile.totalBooks} Büchern in deiner Bibliothek" +
-                        (state.profile.topGenres.firstOrNull()?.let { " – Top-Genre: ${it.first}" } ?: ""),
+                        (state.profile.topGenres.firstOrNull()?.let { " – Top-Genre: ${it.first}" } ?: "") +
+                        (if (state.reranked) " – per KI neu sortiert" else ""),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

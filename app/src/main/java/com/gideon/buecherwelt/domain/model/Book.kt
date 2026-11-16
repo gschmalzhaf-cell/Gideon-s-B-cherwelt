@@ -25,6 +25,10 @@ data class Book(
     val rating: Int? = null,
     val status: ReadingStatus = ReadingStatus.PLANNED,
     val notes: String = "",
+    val aiSummary: String? = null,
+    val aiFitScore: Int? = null,
+    val aiFitReason: String? = null,
+    val aiInsightsAt: Long = 0,
     val tropes: List<Trope> = emptyList(),
     val createdAt: Long = 0,
     val updatedAt: Long = 0

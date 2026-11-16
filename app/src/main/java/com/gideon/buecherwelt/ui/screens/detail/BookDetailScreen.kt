@@ -76,13 +76,22 @@ fun BookDetailScreen(
 ) {
     val viewModel: BookDetailViewModel = viewModel(
         factory = viewModelFactory {
-            BookDetailViewModel(container.bookRepository, container.recommendationEngine, bookId)
+            BookDetailViewModel(
+                container.bookRepository,
+                container.recommendationEngine,
+                container.llmService,
+                container.settingsRepository,
+                bookId
+            )
         }
     )
     val book by viewModel.book.collectAsStateWithLifecycle()
     val similar by viewModel.similar.collectAsStateWithLifecycle()
     val similarLoading by viewModel.similarLoading.collectAsStateWithLifecycle()
     val similarError by viewModel.similarError.collectAsStateWithLifecycle()
+    val llmConfigured by viewModel.llmConfigured.collectAsStateWithLifecycle()
+    val insightsLoading by viewModel.insightsLoading.collectAsStateWithLifecycle()
+    val insightsError by viewModel.insightsError.collectAsStateWithLifecycle()
     var showDeleteDialog by remember { mutableStateOf(false) }
     var similarRequested by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
@@ -90,6 +99,10 @@ fun BookDetailScreen(
 
     LaunchedEffect(similarRequested) {
         if (similarRequested) viewModel.loadSimilar()
+    }
+
+    LaunchedEffect(book?.id, llmConfigured) {
+        if (llmConfigured && book?.aiSummary == null) viewModel.loadInsights()
     }
 
     Scaffold(
@@ -223,6 +236,66 @@ fun BookDetailScreen(
                 item {
                     SectionHeader("Meine Notizen")
                     Text(current.notes, style = MaterialTheme.typography.bodyMedium)
+                }
+            }
+            item {
+                SectionHeader("KI-Einblicke")
+                if (current.aiSummary != null) {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = MaterialTheme.shapes.large,
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text(
+                                "Zusammenfassung (spoilerfrei)",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(Modifier.height(4.dp))
+                            Text(current.aiSummary!!, style = MaterialTheme.typography.bodyMedium)
+                            if (current.aiFitScore != null) {
+                                Spacer(Modifier.height(8.dp))
+                                Text(
+                                    "Passt zu deinem Profil: ${current.aiFitScore}/100",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                                if (!current.aiFitReason.isNullOrBlank()) {
+                                    Text(
+                                        current.aiFitReason!!,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+                if (llmConfigured) {
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedButton(
+                        onClick = { viewModel.loadInsights(force = true) },
+                        enabled = !insightsLoading
+                    ) {
+                        if (insightsLoading) {
+                            CircularProgressIndicator(modifier = Modifier.height(18.dp))
+                        } else {
+                            Icon(Icons.Default.Refresh, contentDescription = null)
+                        }
+                        Spacer(Modifier.width(8.dp))
+                        Text(if (current.aiSummary != null) "KI-Analyse neu generieren" else "KI-Analyse laden")
+                    }
+                }
+                if (insightsError != null) {
+                    Text(
+                        insightsError!!,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.padding(top = 8.dp)
+                    )
                 }
             }
             item {

@@ -24,6 +24,10 @@ data class BookEntity(
     val rating: Int? = null,
     val status: String = ReadingStatus.PLANNED.name,
     val notes: String = "",
+    val aiSummary: String? = null,
+    val aiFitScore: Int? = null,
+    val aiFitReason: String? = null,
+    val aiInsightsAt: Long = 0L,
     val createdAt: Long = 0L,
     val updatedAt: Long = 0L
 )

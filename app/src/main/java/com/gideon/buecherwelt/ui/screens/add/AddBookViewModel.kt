@@ -269,7 +269,16 @@ class AddBookViewModel(
             )
             val tropeIds = tropeRepository.resolveIds(form.selectedTropes)
             if (_state.value.editBookId != null) {
-                bookRepository.update(incoming, tropeIds)
+                val existing = bookRepository.getBook(_state.value.editBookId!!)
+                val preserved = existing?.let {
+                    incoming.copy(
+                        aiSummary = it.aiSummary,
+                        aiFitScore = it.aiFitScore,
+                        aiFitReason = it.aiFitReason,
+                        aiInsightsAt = it.aiInsightsAt
+                    )
+                } ?: incoming
+                bookRepository.update(preserved, tropeIds)
                 _state.update { it.copy(saving = false) }
                 onResult(SaveResult.Saved(_state.value.editBookId!!))
                 return@launch

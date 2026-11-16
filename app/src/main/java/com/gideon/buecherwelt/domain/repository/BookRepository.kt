@@ -60,6 +60,10 @@ class BookRepository(
         tropeIds.forEach { tropeId -> bookDao.addTrope(BookTropeEntity(bookId, tropeId)) }
     }
 
+    suspend fun saveAiInsights(bookId: Long, summary: String, fitScore: Int, fitReason: String) {
+        bookDao.updateAiInsights(bookId, summary, fitScore, fitReason, System.currentTimeMillis())
+    }
+
     suspend fun merge(existing: Book, incoming: Book, newTropeIds: Set<Long>): Book {
         val merged = existing.copy(
             title = existing.title.ifBlank { incoming.title },
@@ -98,6 +102,10 @@ class BookRepository(
         rating = book.rating,
         status = ReadingStatus.fromString(book.status),
         notes = book.notes,
+        aiSummary = book.aiSummary,
+        aiFitScore = book.aiFitScore,
+        aiFitReason = book.aiFitReason,
+        aiInsightsAt = book.aiInsightsAt,
         createdAt = book.createdAt,
         updatedAt = book.updatedAt,
         tropes = tropes.map { Trope(it.id, it.name, it.category, it.isCustom) }
@@ -119,6 +127,10 @@ class BookRepository(
         rating = rating,
         status = status.name,
         notes = notes,
+        aiSummary = aiSummary,
+        aiFitScore = aiFitScore,
+        aiFitReason = aiFitReason,
+        aiInsightsAt = aiInsightsAt,
         createdAt = createdAt,
         updatedAt = updatedAt
     )

@@ -36,7 +36,7 @@ class RecommendationEngine(
                 if (score > 0) out.add(ScoredCandidate(metadata, score, reasons))
             }
         }
-        return out.sortedByDescending { it.score }.take(limit)
+        return applyDiversity(out, limit)
     }
 
     suspend fun similarTo(
@@ -97,6 +97,25 @@ class RecommendationEngine(
                 reasons.add("Verlag aus deinen Favoriten: $publisher")
             }
         }
+        profile.dislikedAuthors.forEach { (author, _) ->
+            if (author.equals(metadata.author, ignoreCase = true) ||
+                metadata.author.contains(author, ignoreCase = true)
+            ) {
+                score -= 3
+            }
+        }
+        profile.dislikedGenres.forEach { (genre, _) ->
+            if (categories.any { it.contains(genre.lowercase()) } ||
+                genre.equals(metadata.genreHint(), ignoreCase = true)
+            ) {
+                score -= 2
+            }
+        }
+        val dislikedOverlap = profile.dislikedTropes.count { (trope, _) ->
+            metadata.title.contains(trope, ignoreCase = true) ||
+                categories.any { it.contains(trope.lowercase()) }
+        }
+        score -= 2 * dislikedOverlap
         return score to reasons.distinct()
     }
 
@@ -130,6 +149,23 @@ class RecommendationEngine(
             score += 1
         }
         return score to reasons.distinct()
+    }
+
+    private fun applyDiversity(candidates: List<ScoredCandidate>, limit: Int): List<ScoredCandidate> {
+        val perAuthor = mutableMapOf<String, Int>()
+        val perGenre = mutableMapOf<String, Int>()
+        val out = mutableListOf<ScoredCandidate>()
+        for (candidate in candidates.sortedByDescending { it.score }) {
+            if (out.size >= limit) break
+            val authorKey = candidate.metadata.author.lowercase()
+            val genreKey = candidate.metadata.genreHint().lowercase()
+            if (authorKey.isNotBlank() && (perAuthor[authorKey] ?: 0) >= 3) continue
+            if (genreKey.isNotBlank() && (perGenre[genreKey] ?: 0) >= 4) continue
+            if (authorKey.isNotBlank()) perAuthor[authorKey] = (perAuthor[authorKey] ?: 0) + 1
+            if (genreKey.isNotBlank()) perGenre[genreKey] = (perGenre[genreKey] ?: 0) + 1
+            out.add(candidate)
+        }
+        return out
     }
 
     companion object {

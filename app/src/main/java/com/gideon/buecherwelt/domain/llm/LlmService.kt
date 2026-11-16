@@ -2,7 +2,10 @@ package com.gideon.buecherwelt.domain.llm
 
 import com.gideon.buecherwelt.data.settings.LlmConfig
 import com.gideon.buecherwelt.domain.analysis.ReadingProfile
+import com.gideon.buecherwelt.domain.model.Book
 import com.gideon.buecherwelt.domain.model.Trope
+import com.gideon.buecherwelt.domain.recommendation.RecommendationEngine
+import com.gideon.buecherwelt.domain.recommendation.ScoredCandidate
 import com.gideon.buecherwelt.domain.repository.TropeRepository
 
 class LlmService(
@@ -29,5 +32,57 @@ class LlmService(
         val (system, user) = LlmPrompts.bookRecommendations(profile)
         val content = client.complete(config, system, user) ?: return emptyList()
         return LlmResponseParser.parseBookRecommendations(content)
+    }
+
+    suspend fun rerankCandidates(
+        config: LlmConfig,
+        profile: ReadingProfile,
+        candidates: List<ScoredCandidate>
+    ): List<ScoredCandidate>? {
+        if (!config.isConfigured || candidates.isEmpty()) return null
+        val (system, user) = LlmPrompts.rerankCandidates(profile, candidates)
+        val content = client.complete(config, system, user) ?: return null
+        val ranked = LlmInsightsParser.parseRerank(content)
+        if (ranked.isEmpty()) return null
+        val byKey = candidates.associateBy { RecommendationEngine.keyOf(it.metadata) }
+        val seen = mutableSetOf<String>()
+        val out = mutableListOf<ScoredCandidate>()
+        ranked.forEach { entry ->
+            val candidate = byKey[entry.key] ?: return@forEach
+            if (!seen.add(entry.key)) return@forEach
+            val reasons = buildList {
+                if (entry.reason.isNotBlank()) add(entry.reason)
+                candidate.reasons.forEach { if (it !in this) add(it) }
+            }
+            out.add(candidate.copy(score = entry.score, reasons = reasons))
+        }
+        candidates.forEach { candidate ->
+            if (RecommendationEngine.keyOf(candidate.metadata) !in seen) out.add(candidate)
+        }
+        return out
+    }
+
+    suspend fun semanticSearch(
+        config: LlmConfig,
+        query: String,
+        books: List<Book>
+    ): SemanticSearchResult? {
+        if (!config.isConfigured || query.isBlank() || books.isEmpty()) return null
+        val (system, user) = LlmPrompts.semanticSearch(query, books)
+        val content = client.complete(config, system, user) ?: return null
+        val result = LlmInsightsParser.parseSemanticSearch(content) ?: return null
+        val validIds = books.map { it.id }.toSet()
+        return result.copy(ids = result.ids.filter { it in validIds }.take(30))
+    }
+
+    suspend fun bookInsights(
+        config: LlmConfig,
+        book: Book,
+        profile: ReadingProfile
+    ): BookInsights? {
+        if (!config.isConfigured) return null
+        val (system, user) = LlmPrompts.bookInsights(book, profile)
+        val content = client.complete(config, system, user) ?: return null
+        return LlmInsightsParser.parseBookInsights(content)
     }
 }

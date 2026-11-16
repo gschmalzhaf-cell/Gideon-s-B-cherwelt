@@ -27,11 +27,17 @@ optionale LLM-Aufrufe (z. B. Mistral) genutzt.
    (nur nach Bestätigung übernommen). **StoryGraph-CSV-Import** (Titel, Autor:in, Status,
    Tags; Buchdaten per ISBN nachladen).
 3. **Statistik** – Dashboard mit Top-Genres, Top-Tropes, Lieblingsautor:innen/-verlagen,
-   Ø Spice-Level, Genre-Verteilung, Status-Übersicht, Lieblingsbüchern. Wird automatisch
-   aus den erfassten Büchern abgeleitet (gelesene + hoch bewertete Bücher zählen stärker).
-4. **Entdecken** – regelbasierte Empfehlungen (gleiche Tropes/Genre/Autor:in/Verlag) und
-   optionale LLM-Empfehlungen mit Begründung; „Ähnliche Bücher" pro Buch; Merkliste;
-   per Klick (ISBN) zur Sammlung hinzufügen.
+   Ø Spice-Level, Ø Bewertung, Genre-Verteilung, Status-Übersicht, Lieblingsbüchern **und
+   „Weniger beliebt"** (Abbrüche + 1-2-Sterne-Bewertungen als negative Signale). Wird
+   automatisch aus den erfassten Büchern abgeleitet (gelesene + hoch bewertete Bücher zählen stärker).
+4. **Entdecken** – regelbasierte Empfehlungen (gleiche Tropes/Genre/Autor:in/Verlag, diversifiziert,
+   negative Signale abgewertet) und optionale LLM-Empfehlungen mit Begründung; bei konfiguriertem
+   LLM-Key zusätzlich **KI-Re-Ranking** der regelbasierten Kandidaten mit Begründung pro Buch;
+   „Ähnliche Bücher" pro Buch; Merkliste; per Klick (ISBN) zur Sammlung hinzufügen.
+5. **KI-Features** (optional, LLM-Key in den Einstellungen) – **semantische Suche** in der
+   Bibliothek per Freitext (z. B. „düstere Bücher mit Happy End") und **KI-Einblicke** in der
+   Buchdetailansicht (spoilerfreie Zusammenfassung + „Passt zu deinem Profil"-Score 0-100,
+   lokal in der Datenbank gecacht).
 
 ## Projektstruktur
 

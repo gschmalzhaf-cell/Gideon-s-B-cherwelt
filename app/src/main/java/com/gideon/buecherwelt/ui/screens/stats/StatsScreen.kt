@@ -117,6 +117,30 @@ fun StatsScreen(container: AppContainer) {
                 SectionHeader("Lieblingsverlage")
                 ChipList(profile.topPublishers.map { it.first })
             }
+            if (profile.dislikedGenres.isNotEmpty() || profile.dislikedAuthors.isNotEmpty() || profile.dislikedTropes.isNotEmpty()) {
+                item {
+                    SectionHeader("Weniger beliebt (Abbrüche & 1-2 Sterne)")
+                    if (profile.abandonedCount > 0) {
+                        Text(
+                            "Abgebrochene Bücher: ${profile.abandonedCount}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    if (profile.dislikedGenres.isNotEmpty()) {
+                        Text("Genres:", style = MaterialTheme.typography.labelMedium)
+                        ChipList(profile.dislikedGenres.map { it.first })
+                    }
+                    if (profile.dislikedAuthors.isNotEmpty()) {
+                        Text("Autor:innen:", style = MaterialTheme.typography.labelMedium)
+                        ChipList(profile.dislikedAuthors.map { it.first })
+                    }
+                    if (profile.dislikedTropes.isNotEmpty()) {
+                        Text("Tropes:", style = MaterialTheme.typography.labelMedium)
+                        ChipList(profile.dislikedTropes.map { it.first })
+                    }
+                }
+            }
             item {
                 SectionHeader("Spice-Level im Schnitt")
                 Row(verticalAlignment = Alignment.CenterVertically) {

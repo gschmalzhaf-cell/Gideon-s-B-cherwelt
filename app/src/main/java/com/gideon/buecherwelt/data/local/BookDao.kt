@@ -51,4 +51,16 @@ interface BookDao {
 
     @Query("DELETE FROM book_tropes WHERE bookId = :bookId")
     suspend fun clearTropes(bookId: Long)
+
+    @Query(
+        "UPDATE books SET aiSummary = :summary, aiFitScore = :fitScore, " +
+            "aiFitReason = :fitReason, aiInsightsAt = :at WHERE id = :bookId"
+    )
+    suspend fun updateAiInsights(
+        bookId: Long,
+        summary: String?,
+        fitScore: Int?,
+        fitReason: String?,
+        at: Long
+    )
 }

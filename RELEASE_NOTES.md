@@ -1,3 +1,20 @@
+# Gideon's Bücherwelt – v1.1.0
+
+Die App lernt jetzt aus negativen Signalen und nutzt das LLM gezielter.
+
+## Neu
+- **Lernendes Leseprofil**: Abgebrochene Bücher und gelesene Bücher mit 1-2 Sternen zählen als negative Signale (eigene „Weniger beliebt"-Listen für Genres, Autor:innen, Tropes in der Statistik; Ø Bewertung und Abbruch-Zahl im Profil)
+- **Smartere Empfehlungen (Entdecken)**: Regelbasierte Kandidaten werden diversifiziert (max. 3 pro Autor:in, 4 pro Genre) und bei konfiguriertem LLM-Key per **KI-Re-Ranking** neu sortiert – inkl. deutscher Begründung pro Buch („weil du …"); negative Signale senken den Score
+- **KI-Suche in der Bibliothek**: Freitext-Suche per LLM gegen die eigene Bibliothek (z. B. „düstere Bücher mit Happy End“), inkl. Erklärung der Treffer; kombinierbar mit den normalen Filtern
+- **KI-Einblicke in der Buchdetailansicht**: spoilerfreie Zusammenfassung + „Passt zu deinem Profil"-Score (0-100) mit Begründung; wird lokal in der Datenbank gecacht (Room v2) und automatisch nachgeladen, manuell neu generierbar
+
+## Technisch
+- Room-Datenbank v1 → v2 (Migration: neue Spalten `aiSummary`, `aiFitScore`, `aiFitReason`, `aiInsightsAt` in `books`)
+
+**Full Changelog**: https://github.com/gschmalzhaf-cell/Gideon-s-B-cherwelt/commits/v1.1.0
+
+---
+
 # Gideon's Bücherwelt – v1.0.7
 
 Lookup-Zuverlässigkeit und KI-Anbindung verbessert (u. a. für 9783453292819 / „Kingmakers – Jahr 1").
