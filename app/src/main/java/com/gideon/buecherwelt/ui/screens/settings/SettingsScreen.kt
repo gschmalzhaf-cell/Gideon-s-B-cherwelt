@@ -1,14 +1,25 @@
 package com.gideon.buecherwelt.ui.screens.settings
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
+import android.content.Intent
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.BugReport
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -16,6 +27,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -23,6 +35,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -42,10 +56,20 @@ fun SettingsScreen(
     navController: NavController
 ) {
     val viewModel: SettingsViewModel = viewModel(
-        factory = viewModelFactory { SettingsViewModel(container.settingsRepository) }
+        factory = viewModelFactory {
+            SettingsViewModel(
+                container.settingsRepository,
+                container.bookRepository,
+                container.tropeRepository,
+                container.wishlistRepository
+            )
+        }
     )
     val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
     val llmConfig by viewModel.llmConfig.collectAsStateWithLifecycle()
+    val report by viewModel.report.collectAsStateWithLifecycle()
+    val reportLoading by viewModel.reportLoading.collectAsStateWithLifecycle()
+    val context = LocalContext.current
 
     var apiKey by remember(llmConfig) { mutableStateOf(llmConfig.apiKey) }
     var baseUrl by remember(llmConfig) { mutableStateOf(llmConfig.baseUrl) }
@@ -164,6 +188,67 @@ fun SettingsScreen(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+            OutlinedButton(
+                onClick = { viewModel.buildReport() },
+                enabled = !reportLoading,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 12.dp)
+            ) {
+                if (reportLoading) {
+                    CircularProgressIndicator(modifier = Modifier.size(16.dp))
+                } else {
+                    Icon(Icons.Default.BugReport, contentDescription = null)
+                }
+                androidx.compose.foundation.layout.Spacer(Modifier.width(8.dp))
+                Text("App-Report erstellen")
+            }
+            Text(
+                "Der Report (Markdown + JSON) wird lokal auf diesem Gerät erzeugt – ohne API-Key – und kann kopiert oder geteilt werden, z. B. zur Fehlersuche.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 4.dp)
+            )
         }
+    }
+
+    if (report != null) {
+        val reportText = report!!
+        AlertDialog(
+            onDismissRequest = viewModel::dismissReport,
+            title = { Text("App-Report") },
+            text = {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState())
+                ) {
+                    Text(
+                        reportText,
+                        style = MaterialTheme.typography.bodySmall,
+                        fontFamily = FontFamily.Monospace
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = viewModel::dismissReport) { Text("Schließen") }
+            },
+            dismissButton = {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TextButton(onClick = {
+                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                        clipboard.setPrimaryClip(ClipData.newPlainText("Bücherwelt App-Report", reportText))
+                    }) { Text("Kopieren") }
+                    TextButton(onClick = {
+                        val send = Intent(Intent.ACTION_SEND).apply {
+                            type = "text/plain"
+                            putExtra(Intent.EXTRA_SUBJECT, "Bücherwelt App-Report")
+                            putExtra(Intent.EXTRA_TEXT, reportText)
+                        }
+                        context.startActivity(Intent.createChooser(send, "Report teilen"))
+                    }) { Text("Teilen") }
+                }
+            }
+        )
     }
 }

@@ -1,3 +1,15 @@
+# Gideon's Bücherwelt – v1.3.0
+
+App-Report zur Fehlersuche und Qualitätsverbesserung.
+
+## Neu
+- **App-Report** in den Einstellungen („Über“ → „App-Report erstellen“): erzeugt **lokal** einen Report als Markdown + eingebettetes JSON (maschinenlesbar) mit App-/Geräteinfos, DB-Version, Einstellungen (API-Key wird **redacted**, nie übertragen), Bibliotheks- und Qualitätsstatistiken (fehlende Cover/Beschreibungen/Genres/Tropes/Bewertungen), Leseprofil-Auszug und kompakter Buchliste
+- Report wird per **Kopieren** (Zwischenablage) oder **Teilen** (Android-Share-Sheet, text/plain) bereitgestellt – es wird nichts an einen Server gesendet
+
+**Full Changelog**: https://github.com/gschmalzhaf-cell/Gideon-s-B-cherwelt/commits/v1.3.0
+
+---
+
 # Gideon's Bücherwelt – v1.2.0
 
 Detailseite ausgebaut: Serien/Fortsetzungen und direktes Aktualisieren der Buchdaten.

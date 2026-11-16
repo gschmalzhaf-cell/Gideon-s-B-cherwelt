@@ -30,6 +30,9 @@ optionale LLM-Aufrufe (z. B. Mistral) genutzt.
    („Cover ändern“ per Galerie). Auf der **Buchdetailseite** zeigt ein eigener Serie-Abschnitt
    alle weiteren Bände (klickbar) plus die kombinierten Genres/Tropes der ganzen Serie –
    direkt vor Ort verknüpfbar/änderbar.
+6. **App-Report** (Einstellungen → Über): lokaler Report als Markdown + JSON (App-/Geräteinfos,
+   DB-Version, Qualitätsstatistiken, Leseprofil, Buchliste; **API-Key wird redacted**) zum
+   Kopieren/Teilen – nichts wird an einen Server gesendet.
 3. **Statistik** – Dashboard mit Top-Genres, Top-Tropes, Lieblingsautor:innen/-verlagen,
    Ø Spice-Level, Ø Bewertung, Genre-Verteilung, Status-Übersicht, Lieblingsbüchern **und
    „Weniger beliebt"** (Abbrüche + 1-2-Sterne-Bewertungen als negative Signale). Wird
