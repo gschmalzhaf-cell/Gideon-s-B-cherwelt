@@ -63,13 +63,13 @@ class SettingsViewModel(
             _enriching.value = true
             _enrichStatus.value = "Starte Abgleich aller Bücher…"
             try {
-                val summary = bookEnrichmentService.refreshAllBooks(onlyMissingCoversOrDetails = false) { done, total ->
-                    _enrichStatus.value = "Prüfe Bücher ($done/$total)…"
+                val summary = bookEnrichmentService.refreshAllBooks(forceCovers = true) { done, total, currentTitle ->
+                    _enrichStatus.value = "Prüfe Bücher ($done/$total): $currentTitle…"
                 }
                 _enrichStatus.value = buildString {
-                    append("${summary.totalChecked} Bücher geprüft")
+                    append("${summary.total} Bücher geprüft")
                     append(" · ${summary.coversUpdated} Cover geladen")
-                    append(" · ${summary.seriesDetected} Reihen/Universen erkannt")
+                    append(" · ${summary.seriesOrUniverseDetected} Reihen/Universen erkannt")
                     append(" · ${summary.detailsUpdated} Details/Tropes aktualisiert.")
                 }
             } finally {

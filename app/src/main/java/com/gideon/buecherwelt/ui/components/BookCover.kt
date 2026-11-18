@@ -21,6 +21,10 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -34,6 +38,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
+import com.gideon.buecherwelt.data.network.CoverCache
 import com.gideon.buecherwelt.ui.theme.PlayfairDisplay
 import java.io.File
 import kotlin.math.abs
@@ -63,13 +68,13 @@ fun BookCover(
         topEnd = cornerRadius,
         bottomEnd = cornerRadius
     )
-    val validFile = androidx.compose.runtime.remember(coverPath) {
-        if (com.gideon.buecherwelt.data.network.CoverCache.isValidCoverFile(coverPath)) {
+    val validFile = remember(coverPath) {
+        if (CoverCache.isValidCoverFile(coverPath)) {
             File(coverPath!!)
         } else null
     }
     val model: Any? = validFile ?: coverUrl?.takeIf { it.isNotBlank() }
-    var imageError by androidx.compose.runtime.remember(model) { androidx.compose.runtime.mutableStateOf(false) }
+    var imageError by remember(model) { mutableStateOf(false) }
 
     Box(
         modifier = modifier

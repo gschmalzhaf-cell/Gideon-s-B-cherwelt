@@ -198,13 +198,13 @@ class LibraryViewModel(
                     enrichMessage = "Prüfe Cover, Reihen, Universen & Buchdetails…"
                 )
             }
-            val summary = bookEnrichmentService.refreshAllBooks(onlyMissingCoversOrDetails = false) { done, total ->
+            val summary = bookEnrichmentService.refreshAllBooks(forceCovers = true) { done, total, _ ->
                 _state.update { it.copy(enrichProgress = done to total) }
             }
             val msg = buildString {
-                append("${summary.totalChecked} Bücher geprüft")
+                append("${summary.total} Bücher geprüft")
                 if (summary.coversUpdated > 0) append(" · ${summary.coversUpdated} Cover geladen")
-                if (summary.seriesDetected > 0) append(" · ${summary.seriesDetected} Reihen/Universen erkannt")
+                if (summary.seriesOrUniverseDetected > 0) append(" · ${summary.seriesOrUniverseDetected} Reihen/Universen erkannt")
                 if (summary.detailsUpdated > 0) append(" · ${summary.detailsUpdated} Details ergänzt")
             }
             _state.update {
