@@ -2,6 +2,7 @@ package com.gideon.buecherwelt.ui.screens.detail
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.gideon.buecherwelt.data.local.ReadingStatus
 import com.gideon.buecherwelt.data.settings.LlmConfig
 import com.gideon.buecherwelt.data.settings.SettingsRepository
 import com.gideon.buecherwelt.domain.analysis.ReadingStatsCalculator
@@ -30,6 +31,14 @@ class BookDetailViewModel(
     val book: StateFlow<Book?> = bookRepository.observeBook(bookId)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
+    val localFit: StateFlow<Pair<Int, String>?> = combine(book, bookRepository.observeBooks()) { current, all ->
+        if (current == null) null
+        else {
+            val profile = ReadingStatsCalculator.compute(all.filter { it.id != current.id })
+            ReadingStatsCalculator.computeLocalFit(current, profile)
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+
     val seriesBooks: StateFlow<List<Book>> = combine(book, bookRepository.observeBooks()) { current, all ->
         if (current == null || current.seriesName.isBlank()) {
             emptyList()
@@ -54,6 +63,30 @@ class BookDetailViewModel(
             val updated = current.copy(
                 seriesName = name.trim(),
                 seriesIndex = index,
+                updatedAt = System.currentTimeMillis()
+            )
+            bookRepository.update(updated, current.tropes.map { it.id }.toSet())
+        }
+    }
+
+    fun setStatus(newStatus: ReadingStatus) {
+        viewModelScope.launch {
+            val current = book.value ?: return@launch
+            if (current.status == newStatus) return@launch
+            val updated = current.copy(
+                status = newStatus,
+                updatedAt = System.currentTimeMillis()
+            )
+            bookRepository.update(updated, current.tropes.map { it.id }.toSet())
+        }
+    }
+
+    fun setRating(newRating: Int) {
+        viewModelScope.launch {
+            val current = book.value ?: return@launch
+            val normalized = if (newRating <= 0) null else newRating.coerceIn(1, 5)
+            val updated = current.copy(
+                rating = normalized,
                 updatedAt = System.currentTimeMillis()
             )
             bookRepository.update(updated, current.tropes.map { it.id }.toSet())
@@ -153,3 +186,4 @@ class BookDetailViewModel(
         }
     }
 }
+

@@ -13,12 +13,15 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Sort
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
@@ -32,6 +35,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.gideon.buecherwelt.data.local.ReadingStatus
+import com.gideon.buecherwelt.ui.screens.library.LibrarySortOrder
 
 @Composable
 fun FilterBar(
@@ -47,14 +51,26 @@ fun FilterBar(
     tropes: List<String>,
     selectedTrope: String?,
     onTropeChange: (String?) -> Unit,
+    seriesNames: List<String> = emptyList(),
+    selectedSeries: String? = null,
+    onSeriesChange: (String?) -> Unit = {},
+    sortOrder: LibrarySortOrder = LibrarySortOrder.RECENT,
+    onSortOrderChange: (LibrarySortOrder) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     Column(modifier = modifier) {
         TextField(
             value = query,
             onValueChange = onQueryChange,
-            placeholder = { Text("Titel, Autor:in oder ISBN suchen") },
+            placeholder = { Text("Titel, Autor:in, Serie, Trope, Notiz oder ISBN…") },
             leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+            trailingIcon = if (query.isNotEmpty()) {
+                {
+                    IconButton(onClick = { onQueryChange("") }) {
+                        Icon(Icons.Default.Close, contentDescription = "Suche leeren")
+                    }
+                }
+            } else null,
             singleLine = true,
             shape = RoundedCornerShape(12.dp),
             colors = TextFieldDefaults.colors(
@@ -74,12 +90,9 @@ fun FilterBar(
                 .padding(top = 8.dp)
                 .fillMaxWidth()
         ) {
-            FilterDropdown(
-                label = "Genre",
-                options = genres,
-                selected = selectedGenre,
-                onSelected = onGenreChange,
-                display = { it }
+            SortDropdown(
+                selected = sortOrder,
+                onSelected = onSortOrderChange
             )
             FilterDropdown(
                 label = "Status",
@@ -88,6 +101,22 @@ fun FilterBar(
                 onSelected = onStatusChange,
                 display = { it.label }
             )
+            FilterDropdown(
+                label = "Genre",
+                options = genres,
+                selected = selectedGenre,
+                onSelected = onGenreChange,
+                display = { it }
+            )
+            if (seriesNames.isNotEmpty()) {
+                FilterDropdown(
+                    label = "Serie",
+                    options = seriesNames,
+                    selected = selectedSeries,
+                    onSelected = onSeriesChange,
+                    display = { it }
+                )
+            }
             FilterDropdown(
                 label = "Bewertung",
                 options = listOf(5, 4, 3, 2, 1),
@@ -102,6 +131,53 @@ fun FilterBar(
                 onSelected = onTropeChange,
                 display = { it }
             )
+        }
+    }
+}
+
+@Composable
+private fun SortDropdown(
+    selected: LibrarySortOrder,
+    onSelected: (LibrarySortOrder) -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+    Box {
+        FilterChip(
+            selected = selected != LibrarySortOrder.RECENT,
+            onClick = { expanded = true },
+            shape = CircleShape,
+            leadingIcon = {
+                Icon(Icons.Default.Sort, contentDescription = null, modifier = Modifier.size(16.dp))
+            },
+            label = {
+                Text(
+                    text = selected.label,
+                    style = MaterialTheme.typography.labelMedium
+                )
+            },
+            trailingIcon = {
+                Icon(Icons.Default.ArrowDropDown, contentDescription = null, modifier = Modifier.size(18.dp))
+            },
+            colors = FilterChipDefaults.filterChipColors(
+                containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                labelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                iconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                selectedLeadingIconColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                selectedTrailingIconColor = MaterialTheme.colorScheme.onPrimaryContainer
+            )
+        )
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            LibrarySortOrder.entries.forEach { order ->
+                DropdownMenuItem(
+                    text = { Text(order.label) },
+                    onClick = {
+                        onSelected(order)
+                        expanded = false
+                    }
+                )
+            }
         }
     }
 }
@@ -158,3 +234,4 @@ private fun <T> FilterDropdown(
         }
     }
 }
+

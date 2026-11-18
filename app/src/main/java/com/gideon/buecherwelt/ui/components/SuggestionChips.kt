@@ -36,7 +36,7 @@ fun SuggestionChips(
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
             Text(
-                text = "LLM-Vorschläge – antippen zum Übernehmen",
+                text = "Intelligente Vorschläge – antippen zum Übernehmen",
                 style = MaterialTheme.typography.labelLarge
             )
             if (suggestions.tropes.isNotEmpty()) {

@@ -1,3 +1,25 @@
+# Gideon's Bücherwelt – v1.4.0
+
+Edler Bücherstyle & intelligente Buch-Analyse (100 % lokal + KI-gestützt).
+
+## Neu & Verbessert
+- **Edler Bücherstyle in der gesamten App**:
+  - **Realistische 3D-Buchcover** mit Buchfalz-Lichtkante, dezenter Buchseiten-Kontur und einem kunstvollen **Leineneinband-Cover-Generator** (Playfair Display Serif, Goldrahmen & 6 klassische Einbandfarben), falls kein Coverbild vorliegt
+  - **Bücherregal-Optik** in der Bibliothek mit Holzregal-Leiste unter jedem Buch, rotem **Lesezeichen-Bändchen** für aktuell gelesene Bücher, **Serien-Band-Plakette** (`Bd. X`) und **Profil-Match-Badge** (`%`)
+  - **„Aktuell auf deinem Lesepult“**: eigenes Showcase-Regal oben in der Bibliothek für alle Bücher mit Status „Lesend“
+  - **Buch-Typografie & Exlibris-Stil**: Überschriften, Buchtitel und Zitat-/Notizkarten in **Playfair Display** mit Schmucklinie
+- **Intelligentere Funktionen (auch komplett offline ohne API-Key)**:
+  - **Automatische Serien- & Band-Erkennung** direkt aus dem Buchtitel beim Laden von ISBN/Cover-Metadaten (z. B. „… – Band 2“, „(… Teil 1)“, „… – Jahr 1“)
+  - **Intelligente Klappentext-Analyse**: erkennt automatisch passende **Tropes, Genres und das Spice-Level (0–5)** aus Klappentext & Kategorien – sofort beim Laden und jederzeit per Klick (nutzt optional das konfigurierte LLM oder die eingebaute lokale Semantik-Engine)
+  - **Lokaler Profil-Match-Score (0–100 %)** auf jeder Buchdetailseite inkl. Fortschrittsbalken und deutscher Begründung anhand deiner Lieblingsgenres, Autor:innen, Serien, Tropes und Abbrüche – plus Schnellwechsel für **Lesestatus & Sterne-Bewertung** direkt auf der Detailseite
+  - **SuB-Berater („Als Nächstes lesen“)** im Entdecken-Tab: empfiehlt dir die passendsten ungelesenen Bücher („Geplant“) aus deinem eigenen Regal mit Match-Score
+  - **Exlibris Lese-Archetyp** in der Statistik („Lese-Chronik & Exlibris“): ermittelt automatisch deine persönliche Leser-Identität & Ehrenregal
+  - **Erweiterte Suche, Serien-Filter & Sortierung** in der Bibliothek (Sortierung nach *Zuletzt*, *Titel A–Z*, *Autor:in*, *Bewertung ★*, *Serie & Band*, *Profil-Match*; Volltextsuche über Titel, Autor:in, Serie, Tropes, Klappentext, Notizen und ISBN)
+
+**Full Changelog**: https://github.com/gschmalzhaf-cell/Gideon-s-B-cherwelt/commits/v1.4.0
+
+---
+
 # Gideon's Bücherwelt – v1.3.0
 
 App-Report zur Fehlersuche und Qualitätsverbesserung.

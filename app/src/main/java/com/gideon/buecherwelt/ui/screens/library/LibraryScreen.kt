@@ -1,25 +1,36 @@
 package com.gideon.buecherwelt.ui.screens.library
 
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.AutoStories
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
@@ -34,17 +45,22 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.gideon.buecherwelt.di.AppContainer
+import com.gideon.buecherwelt.domain.model.Book
 import com.gideon.buecherwelt.ui.components.AppTextField
 import com.gideon.buecherwelt.ui.components.BookCard
+import com.gideon.buecherwelt.ui.components.BookCover
 import com.gideon.buecherwelt.ui.components.EmptyState
 import com.gideon.buecherwelt.ui.components.FilterBar
 import com.gideon.buecherwelt.ui.navigation.Screen
+import com.gideon.buecherwelt.ui.theme.PlayfairDisplay
 import com.gideon.buecherwelt.ui.viewModelFactory
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -73,7 +89,7 @@ fun LibraryScreen(
                         Surface(
                             shape = CircleShape,
                             color = MaterialTheme.colorScheme.primaryContainer,
-                            modifier = Modifier.size(36.dp)
+                            modifier = Modifier.size(38.dp)
                         ) {
                             Box(contentAlignment = Alignment.Center) {
                                 Icon(
@@ -85,11 +101,22 @@ fun LibraryScreen(
                             }
                         }
                         Spacer(modifier = Modifier.width(10.dp))
-                        Text(
-                            text = "Gideon's Bücherwelt",
-                            color = MaterialTheme.colorScheme.primary,
-                            fontWeight = FontWeight.Bold
-                        )
+                        Column {
+                            Text(
+                                text = "Gideon's Bücherwelt",
+                                style = MaterialTheme.typography.titleLarge,
+                                fontFamily = PlayfairDisplay,
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.Bold
+                            )
+                            if (state.books.isNotEmpty()) {
+                                Text(
+                                    text = "${state.profile.archetype.badge} · ${state.books.size} Werke im Regal",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
                     }
                 },
                 actions = {
@@ -100,7 +127,11 @@ fun LibraryScreen(
             )
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = { navController.navigate(Screen.AddBook.create()) }) {
+            FloatingActionButton(
+                onClick = { navController.navigate(Screen.AddBook.create()) },
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary
+            ) {
                 Icon(Icons.Default.Add, contentDescription = "Buch hinzufügen")
             }
         }
@@ -124,7 +155,12 @@ fun LibraryScreen(
                 tropes = state.tropes,
                 selectedTrope = state.trope,
                 onTropeChange = viewModel::setTrope,
-                modifier = Modifier.padding(top = 12.dp)
+                seriesNames = state.seriesNames,
+                selectedSeries = state.series,
+                onSeriesChange = viewModel::setSeries,
+                sortOrder = state.sortOrder,
+                onSortOrderChange = viewModel::setSortOrder,
+                modifier = Modifier.padding(top = 8.dp)
             )
             if (state.llmConfigured) {
                 Row(
@@ -178,28 +214,60 @@ fun LibraryScreen(
                 }
             }
             val filtered = state.filtered
+            val readingBooks = state.readingBooks
+            val showReadingShowcase = readingBooks.isNotEmpty() &&
+                state.query.isBlank() &&
+                state.status == null &&
+                !state.semanticActive
+
             if (filtered.isEmpty()) {
                 EmptyState(
                     title = "Keine Bücher gefunden",
                     subtitle = if (state.semanticActive) {
                         "Die KI-Suche hat keine passenden Bücher gefunden – Frage oder Filter anpassen."
+                    } else if (state.books.isEmpty()) {
+                        "Deine Regale warten auf ihr erstes Werk. Füge Bücher per ISBN-Scan, Cover-Foto oder manuell über das + hinzu."
                     } else {
-                        "Füge dein erstes Buch per ISBN-Scan oder manuell über das + hinzu."
+                        "Kein Buch entspricht den gewählten Filtern."
                     },
                     modifier = Modifier.fillMaxSize()
                 )
             } else {
-                Text(
-                    text = "${filtered.size} von ${state.books.size} Büchern",
-                    style = androidx.compose.material3.MaterialTheme.typography.bodySmall,
-                    modifier = Modifier.padding(vertical = 8.dp)
-                )
                 LazyVerticalGrid(
                     columns = GridCells.Adaptive(minSize = 110.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(14.dp),
+                    contentPadding = PaddingValues(top = 8.dp, bottom = 84.dp),
                     modifier = Modifier.fillMaxSize()
                 ) {
+                    if (showReadingShowcase) {
+                        item(span = { GridItemSpan(maxLineSpan) }) {
+                            ReadingDeskShowcase(
+                                books = readingBooks,
+                                onBookClick = { navController.navigate(Screen.BookDetail.create(it.id)) }
+                            )
+                        }
+                    }
+                    item(span = { GridItemSpan(maxLineSpan) }) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Bücherregal (${filtered.size} von ${state.books.size})",
+                                style = MaterialTheme.typography.labelLarge,
+                                fontFamily = PlayfairDisplay,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Text(
+                                text = "Sortiert: ${state.sortOrder.label}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
                     items(filtered, key = { it.id }) { book ->
                         BookCard(
                             book = book,
@@ -211,3 +279,106 @@ fun LibraryScreen(
         }
     }
 }
+
+@Composable
+private fun ReadingDeskShowcase(
+    books: List<Book>,
+    onBookClick: (Book) -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.large,
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f)
+        ),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f))
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Default.AutoStories,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    text = "Aktuell auf deinem Lesepult (${books.size})",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontFamily = PlayfairDisplay,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+            Spacer(Modifier.height(8.dp))
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                items(books, key = { "desk_${it.id}" }) { book ->
+                    Surface(
+                        shape = MaterialTheme.shapes.medium,
+                        color = MaterialTheme.colorScheme.surface,
+                        border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant),
+                        modifier = Modifier
+                            .width(230.dp)
+                            .clickable { onBookClick(book) }
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            BookCover(
+                                coverPath = book.coverPath,
+                                coverUrl = book.coverUrl,
+                                contentDescription = book.title,
+                                title = book.title,
+                                author = book.author,
+                                cornerRadius = 6.dp,
+                                modifier = Modifier
+                                    .width(42.dp)
+                                    .aspectRatio(2f / 3f)
+                            )
+                            Column(modifier = Modifier.padding(start = 10.dp)) {
+                                Text(
+                                    text = book.title,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontFamily = PlayfairDisplay,
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                if (book.author.isNotBlank()) {
+                                    Text(
+                                        text = book.author,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                                val sub = buildList {
+                                    if (book.seriesName.isNotBlank()) {
+                                        add(
+                                            book.seriesName + (book.seriesIndex?.let { " #$it" } ?: "")
+                                        )
+                                    } else if (book.genre.isNotBlank()) {
+                                        add(book.genre)
+                                    }
+                                }.joinToString(" · ")
+                                if (sub.isNotBlank()) {
+                                    Text(
+                                        text = sub,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontStyle = FontStyle.Italic,
+                                        color = MaterialTheme.colorScheme.primary,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+

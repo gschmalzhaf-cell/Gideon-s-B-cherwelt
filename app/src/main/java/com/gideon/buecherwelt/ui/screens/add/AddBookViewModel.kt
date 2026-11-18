@@ -199,9 +199,23 @@ class AddBookViewModel(
         val coverPath = meta.coverUrl?.let {
             coverCache.download(it, CoverCache.keyFor(meta.isbn, meta.title, meta.author))
         }
+        val detectedSeries = com.gideon.buecherwelt.domain.analysis.ReadingStatsCalculator
+            .detectSeriesFromTitle(meta.title, _state.value.seriesNames)
+        val localSuggestions = com.gideon.buecherwelt.domain.analysis.ReadingStatsCalculator
+            .inferBookIntelligence(
+                title = meta.title,
+                description = meta.description,
+                categories = meta.categories,
+                catalog = _state.value.allTropes
+            )
         _state.update {
             it.copy(
                 loading = false,
+                suggestions = if (
+                    localSuggestions.tropes.isNotEmpty() ||
+                    localSuggestions.genres.isNotEmpty() ||
+                    (localSuggestions.spice ?: 0) > 0
+                ) localSuggestions else null,
                 formInit = FormInit(
                     isbn = meta.isbn ?: rawIsbn?.let { r -> BookMetadataFetcher.normalizeIsbn(r) },
                     title = meta.title,
@@ -209,8 +223,14 @@ class AddBookViewModel(
                     publisher = meta.publisher,
                     publishedYear = meta.publishedYear,
                     description = meta.description,
-                    genre = meta.categories.firstOrNull().orEmpty(),
-                    subgenre = meta.categories.getOrNull(1).orEmpty(),
+                    genre = meta.categories.firstOrNull()
+                        ?: localSuggestions.genres.firstOrNull().orEmpty(),
+                    subgenre = meta.categories.getOrNull(1)
+                        ?: localSuggestions.genres.getOrNull(1).orEmpty(),
+                    spice = localSuggestions.spice ?: 0,
+                    seriesName = detectedSeries?.first.orEmpty(),
+                    seriesIndex = detectedSeries?.second,
+                    tropes = localSuggestions.tropes.take(4).toSet(),
                     coverUrl = meta.coverUrl,
                     coverPath = coverPath
                 )
@@ -218,27 +238,56 @@ class AddBookViewModel(
         }
     }
 
-    fun suggestTropes() {
-        val form = _state.value.formInit ?: return
+    fun suggestTropes(
+        currentTitle: String? = null,
+        currentAuthor: String? = null,
+        currentDescription: String? = null,
+        currentGenre: String? = null,
+        currentSubgenre: String? = null
+    ) {
+        val form = _state.value.formInit
+        val title = currentTitle ?: form?.title.orEmpty()
+        val author = currentAuthor ?: form?.author.orEmpty()
+        val description = currentDescription ?: form?.description.orEmpty()
+        val categories = listOfNotNull(
+            (currentGenre ?: form?.genre)?.takeIf { it.isNotBlank() },
+            (currentSubgenre ?: form?.subgenre)?.takeIf { it.isNotBlank() }
+        )
+
+        val localFallback = com.gideon.buecherwelt.domain.analysis.ReadingStatsCalculator
+            .inferBookIntelligence(
+                title = title,
+                description = description,
+                categories = categories,
+                catalog = _state.value.allTropes
+            )
+
         if (!llmConfig.isConfigured) {
-            _state.update { it.copy(error = "Kein LLM-API-Key hinterlegt – bitte in den Einstellungen konfigurieren.") }
+            _state.update {
+                it.copy(
+                    suggestions = localFallback,
+                    error = if (localFallback.tropes.isEmpty() && localFallback.genres.isEmpty()) {
+                        "Für mehr Vorschläge Klappentext eingeben oder einen LLM-Key in den Einstellungen hinterlegen."
+                    } else null
+                )
+            }
             return
         }
         viewModelScope.launch {
             _state.update { it.copy(suggestionLoading = true, error = null) }
             val suggestion = llmService.suggestTropes(
                 config = llmConfig,
-                title = form.title,
-                author = form.author,
-                description = form.description,
-                categories = listOfNotNull(form.genre, form.subgenre)
+                title = title,
+                author = author,
+                description = description,
+                categories = categories
             )
             _state.update {
                 it.copy(
                     suggestionLoading = false,
-                    suggestions = suggestion,
+                    suggestions = suggestion ?: localFallback,
                     error = if (suggestion == null) {
-                        "LLM-Vorschläge nicht verfügbar (offline oder API-Fehler). Tropes können manuell gewählt werden."
+                        "LLM-Abfrage nicht erreichbar – intelligente lokale Analyse aus dem Klappentext angezeigt."
                     } else it.error
                 )
             }

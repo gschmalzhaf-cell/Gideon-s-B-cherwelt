@@ -403,17 +403,26 @@ fun AddBookScreen(
             }
 
             Text("Tropes / Tags", style = MaterialTheme.typography.labelLarge)
-            if (state.llmConfigured && formInit != null && editBookId == null) {
-                OutlinedButton(
-                    onClick = viewModel::suggestTropes,
-                    enabled = !state.suggestionLoading
-                ) {
-                    if (state.suggestionLoading) {
-                        CircularProgressIndicator(modifier = Modifier.size(18.dp))
-                    }
+            OutlinedButton(
+                onClick = {
+                    viewModel.suggestTropes(
+                        currentTitle = title,
+                        currentAuthor = author,
+                        currentDescription = description,
+                        currentGenre = genre,
+                        currentSubgenre = subgenre
+                    )
+                },
+                enabled = !state.suggestionLoading && (title.isNotBlank() || description.isNotBlank())
+            ) {
+                if (state.suggestionLoading) {
+                    CircularProgressIndicator(modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text("Tropes per LLM vorschlagen")
                 }
+                Text(
+                    if (state.llmConfigured) "Tropes & Spice intelligent erkennen (KI + Klappentext)"
+                    else "Tropes & Spice intelligent aus Klappentext erkennen"
+                )
             }
             if (state.suggestions != null) {
                 SuggestionChips(

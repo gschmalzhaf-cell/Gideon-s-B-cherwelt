@@ -5,27 +5,40 @@ import androidx.lifecycle.viewModelScope
 import com.gideon.buecherwelt.data.local.ReadingStatus
 import com.gideon.buecherwelt.data.settings.LlmConfig
 import com.gideon.buecherwelt.data.settings.SettingsRepository
+import com.gideon.buecherwelt.domain.analysis.ReadingProfile
+import com.gideon.buecherwelt.domain.analysis.ReadingStatsCalculator
 import com.gideon.buecherwelt.domain.llm.LlmService
 import com.gideon.buecherwelt.domain.model.Book
 import com.gideon.buecherwelt.domain.repository.BookRepository
 import com.gideon.buecherwelt.domain.repository.TropeRepository
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
+enum class LibrarySortOrder(val label: String) {
+    RECENT("Zuletzt"),
+    TITLE("Titel A–Z"),
+    AUTHOR("Autor:in"),
+    RATING("Bewertung ★"),
+    SERIES("Serie & Band"),
+    FIT_SCORE("Profil-Match")
+}
+
 data class LibraryUiState(
     val books: List<Book> = emptyList(),
+    val profile: ReadingProfile = ReadingProfile(),
     val query: String = "",
     val genre: String? = null,
     val status: ReadingStatus? = null,
     val minRating: Int = 0,
     val trope: String? = null,
+    val series: String? = null,
+    val sortOrder: LibrarySortOrder = LibrarySortOrder.RECENT,
     val genres: List<String> = emptyList(),
     val tropes: List<String> = emptyList(),
+    val seriesNames: List<String> = emptyList(),
     val semanticQuery: String = "",
     val semanticActive: Boolean = false,
     val semanticLoading: Boolean = false,
@@ -34,19 +47,65 @@ data class LibraryUiState(
     val semanticError: String? = null,
     val llmConfigured: Boolean = false
 ) {
+    val readingBooks: List<Book>
+        get() = books.filter { it.status == ReadingStatus.READING }
+
     val filtered: List<Book>
         get() {
             val ids = if (semanticActive) semanticIds else null
-            return books.filter { book ->
+            val q = query.trim()
+            val qIsbn = isbnComparable(q)
+            val matched = books.filter { book ->
+                val matchesQuery = q.isBlank() ||
+                    book.title.contains(q, ignoreCase = true) ||
+                    book.author.contains(q, ignoreCase = true) ||
+                    book.seriesName.contains(q, ignoreCase = true) ||
+                    book.genre.contains(q, ignoreCase = true) ||
+                    book.subgenre.contains(q, ignoreCase = true) ||
+                    book.publisher.contains(q, ignoreCase = true) ||
+                    book.notes.contains(q, ignoreCase = true) ||
+                    book.description.contains(q, ignoreCase = true) ||
+                    book.tropes.any { it.name.contains(q, ignoreCase = true) } ||
+                    (qIsbn.isNotEmpty() && isbnComparable(book.isbn ?: "").contains(qIsbn))
+
                 (ids == null || book.id in ids) &&
-                    (query.isBlank() ||
-                        book.title.contains(query, ignoreCase = true) ||
-                        book.author.contains(query, ignoreCase = true) ||
-                        isbnComparable(book.isbn ?: "").contains(isbnComparable(query))) &&
+                    matchesQuery &&
                     (genre == null || book.genre == genre) &&
                     (status == null || book.status == status) &&
                     (minRating == 0 || (book.rating ?: 0) >= minRating) &&
-                    (trope == null || book.tropes.any { it.name == trope })
+                    (trope == null || book.tropes.any { it.name == trope }) &&
+                    (series == null || book.seriesName.equals(series, ignoreCase = true))
+            }
+
+            if (semanticActive && semanticIds != null) {
+                val orderMap = semanticIds.withIndex().associate { it.value to it.index }
+                return matched.sortedBy { orderMap[it.id] ?: Int.MAX_VALUE }
+            }
+
+            return when (sortOrder) {
+                LibrarySortOrder.RECENT -> matched.sortedByDescending { maxOf(it.updatedAt, it.createdAt, it.id) }
+                LibrarySortOrder.TITLE -> matched.sortedBy { it.title.lowercase() }
+                LibrarySortOrder.AUTHOR -> matched.sortedWith(
+                    compareBy<Book> { it.author.ifBlank { "zzz" }.lowercase() }
+                        .thenBy { it.seriesName.lowercase() }
+                        .thenBy { it.seriesIndex ?: Int.MAX_VALUE }
+                        .thenBy { it.title.lowercase() }
+                )
+                LibrarySortOrder.RATING -> matched.sortedWith(
+                    compareByDescending<Book> { it.rating ?: 0 }
+                        .thenByDescending { it.aiFitScore ?: ReadingStatsCalculator.computeLocalFit(it, profile).first }
+                        .thenBy { it.title.lowercase() }
+                )
+                LibrarySortOrder.SERIES -> matched.sortedWith(
+                    compareBy<Book> { it.seriesName.ifBlank { "zzz" }.lowercase() }
+                        .thenBy { it.seriesIndex ?: Int.MAX_VALUE }
+                        .thenBy { it.title.lowercase() }
+                )
+                LibrarySortOrder.FIT_SCORE -> matched.sortedWith(
+                    compareByDescending<Book> {
+                        it.aiFitScore ?: ReadingStatsCalculator.computeLocalFit(it, profile).first
+                    }.thenByDescending { it.rating ?: 0 }
+                )
             }
         }
 }
@@ -72,13 +131,19 @@ class LibraryViewModel(
         }
         viewModelScope.launch {
             bookRepository.observeBooks().collect { books ->
+                val profile = ReadingStatsCalculator.compute(books)
                 _state.update {
                     it.copy(
                         books = books,
+                        profile = profile,
                         genres = books.map { b -> b.genre }
                             .filter { g -> g.isNotBlank() }
                             .distinct()
-                            .sorted()
+                            .sorted(),
+                        seriesNames = books.map { b -> b.seriesName }
+                            .filter { s -> s.isNotBlank() }
+                            .distinct()
+                            .sortedBy { s -> s.lowercase() }
                     )
                 }
             }
@@ -98,6 +163,8 @@ class LibraryViewModel(
     fun setStatus(status: ReadingStatus?) = _state.update { it.copy(status = status) }
     fun setMinRating(rating: Int) = _state.update { it.copy(minRating = rating) }
     fun setTrope(trope: String?) = _state.update { it.copy(trope = trope) }
+    fun setSeries(series: String?) = _state.update { it.copy(series = series) }
+    fun setSortOrder(order: LibrarySortOrder) = _state.update { it.copy(sortOrder = order) }
 
     fun setSemanticQuery(query: String) = _state.update { it.copy(semanticQuery = query) }
 
@@ -149,3 +216,4 @@ class LibraryViewModel(
 
 private fun isbnComparable(s: String): String =
     s.uppercase().filter { it != '-' && !it.isWhitespace() }
+
