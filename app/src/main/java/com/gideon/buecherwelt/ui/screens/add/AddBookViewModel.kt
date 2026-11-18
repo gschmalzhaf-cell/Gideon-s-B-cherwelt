@@ -25,9 +25,12 @@ import kotlinx.coroutines.launch
 data class FormInit(
     val isbn: String? = null,
     val title: String = "",
+    val subtitle: String = "",
     val author: String = "",
     val publisher: String = "",
     val publishedYear: Int? = null,
+    val pageCount: Int? = null,
+    val language: String = "",
     val description: String = "",
     val genre: String = "",
     val subgenre: String = "",
@@ -37,6 +40,7 @@ data class FormInit(
     val notes: String = "",
     val seriesName: String = "",
     val seriesIndex: Int? = null,
+    val universeName: String = "",
     val tropes: Set<String> = emptySet(),
     val coverUrl: String? = null,
     val coverPath: String? = null
@@ -44,9 +48,12 @@ data class FormInit(
 
 data class BookForm(
     val title: String,
+    val subtitle: String = "",
     val author: String,
     val publisher: String,
     val publishedYear: Int?,
+    val pageCount: Int? = null,
+    val language: String = "",
     val description: String,
     val genre: String,
     val subgenre: String,
@@ -56,6 +63,7 @@ data class BookForm(
     val notes: String,
     val seriesName: String,
     val seriesIndex: Int?,
+    val universeName: String = "",
     val selectedTropes: Set<String>
 )
 
@@ -75,7 +83,8 @@ data class AddBookUiState(
     val llmConfigured: Boolean = false,
     val saving: Boolean = false,
     val editBookId: Long? = null,
-    val seriesNames: List<String> = emptyList()
+    val seriesNames: List<String> = emptyList(),
+    val universeNames: List<String> = emptyList()
 )
 
 class AddBookViewModel(
@@ -111,6 +120,11 @@ class AddBookViewModel(
                 _state.update { it.copy(seriesNames = names) }
             }
         }
+        viewModelScope.launch {
+            bookRepository.observeUniverseNames().collect { names ->
+                _state.update { it.copy(universeNames = names) }
+            }
+        }
         if (editBookId != null) {
             viewModelScope.launch { loadForEdit(editBookId) }
         }
@@ -123,9 +137,12 @@ class AddBookViewModel(
                 formInit = FormInit(
                     isbn = book.isbn,
                     title = book.title,
+                    subtitle = book.subtitle,
                     author = book.author,
                     publisher = book.publisher,
                     publishedYear = book.publishedYear,
+                    pageCount = book.pageCount,
+                    language = book.language,
                     description = book.description,
                     genre = book.genre,
                     subgenre = book.subgenre,
@@ -135,6 +152,7 @@ class AddBookViewModel(
                     notes = book.notes,
                     seriesName = book.seriesName,
                     seriesIndex = book.seriesIndex,
+                    universeName = book.universeName,
                     tropes = book.tropes.map { t -> t.name }.toSet(),
                     coverUrl = book.coverUrl,
                     coverPath = book.coverPath
@@ -154,7 +172,7 @@ class AddBookViewModel(
                 is FetchResult.NotFound -> _state.update {
                     it.copy(
                         loading = false,
-                        error = "Zu dieser Kennung wurden keine Daten gefunden (Google Books, Open Library und DNB gepr\u00fcft). Du kannst das Buch unten manuell anlegen."
+                        error = "Zu dieser Kennung wurden keine Daten gefunden (Google Books, Open Library und DNB geprüft). Du kannst das Buch unten manuell anlegen."
                     )
                 }
                 is FetchResult.NoNetwork -> _state.update {
@@ -182,11 +200,11 @@ class AddBookViewModel(
                 is FetchResult.NotFound -> _state.update {
                     it.copy(
                         loading = false,
-                        error = "Buch auf dem Cover nicht erkannt (LLM/OCR + Google Books/Open Library/DNB). Bitte manuell ausf\u00fcllen."
+                        error = "Buch auf dem Cover nicht erkannt (LLM/OCR + Google Books/Open Library/DNB). Bitte manuell ausfüllen."
                     )
                 }
                 is FetchResult.NoNetwork -> _state.update {
-                    it.copy(loading = false, error = "Keine Netzwerkverbindung. Manuelle Erfassung ist trotzdem m\u00f6glich.")
+                    it.copy(loading = false, error = "Keine Netzwerkverbindung. Manuelle Erfassung ist trotzdem möglich.")
                 }
                 is FetchResult.Error -> _state.update {
                     it.copy(loading = false, error = result.message)
@@ -196,17 +214,32 @@ class AddBookViewModel(
     }
 
     private suspend fun applyMetadata(meta: BookMetadata, rawIsbn: String?) {
-        val coverPath = meta.coverUrl?.let {
-            coverCache.download(it, CoverCache.keyFor(meta.isbn, meta.title, meta.author))
-        }
-        val detectedSeries = com.gideon.buecherwelt.domain.analysis.ReadingStatsCalculator
-            .detectSeriesFromTitle(meta.title, _state.value.seriesNames)
+        val effectiveIsbn = meta.isbn ?: rawIsbn?.let { r -> BookMetadataFetcher.normalizeIsbn(r) }
+        val coverPath = coverCache.downloadWithFallback(
+            primaryUrl = meta.coverUrl,
+            isbn = effectiveIsbn,
+            key = CoverCache.keyFor(effectiveIsbn, meta.title, meta.author),
+            forceRefresh = true
+        )
+        val detectedSU = com.gideon.buecherwelt.domain.analysis.SeriesUniverseDetector.detect(
+            title = meta.title,
+            subtitle = meta.subtitle,
+            author = meta.author,
+            description = meta.description,
+            apiSeries = meta.seriesHints,
+            existingSeries = _state.value.seriesNames,
+            existingUniverses = _state.value.universeNames
+        )
         val localSuggestions = com.gideon.buecherwelt.domain.analysis.ReadingStatsCalculator
             .inferBookIntelligence(
-                title = meta.title,
-                description = meta.description,
+                title = "${meta.title} ${meta.subtitle}".trim(),
+                description = "${meta.description} ${meta.author} ${detectedSU.seriesName} ${detectedSU.universeName}",
                 categories = meta.categories,
                 catalog = _state.value.allTropes
+            ).copy(
+                seriesName = detectedSU.seriesName,
+                seriesIndex = detectedSU.seriesIndex,
+                universeName = detectedSU.universeName
             )
         _state.update {
             it.copy(
@@ -217,20 +250,24 @@ class AddBookViewModel(
                     (localSuggestions.spice ?: 0) > 0
                 ) localSuggestions else null,
                 formInit = FormInit(
-                    isbn = meta.isbn ?: rawIsbn?.let { r -> BookMetadataFetcher.normalizeIsbn(r) },
+                    isbn = effectiveIsbn,
                     title = meta.title,
+                    subtitle = meta.subtitle,
                     author = meta.author,
                     publisher = meta.publisher,
                     publishedYear = meta.publishedYear,
+                    pageCount = meta.pageCount,
+                    language = meta.language,
                     description = meta.description,
                     genre = meta.categories.firstOrNull()
                         ?: localSuggestions.genres.firstOrNull().orEmpty(),
                     subgenre = meta.categories.getOrNull(1)
                         ?: localSuggestions.genres.getOrNull(1).orEmpty(),
                     spice = localSuggestions.spice ?: 0,
-                    seriesName = detectedSeries?.first.orEmpty(),
-                    seriesIndex = detectedSeries?.second,
-                    tropes = localSuggestions.tropes.take(4).toSet(),
+                    seriesName = detectedSU.seriesName,
+                    seriesIndex = detectedSU.seriesIndex,
+                    universeName = detectedSU.universeName,
+                    tropes = localSuggestions.tropes.take(5).toSet(),
                     coverUrl = meta.coverUrl,
                     coverPath = coverPath
                 )
@@ -240,6 +277,7 @@ class AddBookViewModel(
 
     fun suggestTropes(
         currentTitle: String? = null,
+        currentSubtitle: String? = null,
         currentAuthor: String? = null,
         currentDescription: String? = null,
         currentGenre: String? = null,
@@ -247,6 +285,7 @@ class AddBookViewModel(
     ) {
         val form = _state.value.formInit
         val title = currentTitle ?: form?.title.orEmpty()
+        val subtitle = currentSubtitle ?: form?.subtitle.orEmpty()
         val author = currentAuthor ?: form?.author.orEmpty()
         val description = currentDescription ?: form?.description.orEmpty()
         val categories = listOfNotNull(
@@ -254,12 +293,25 @@ class AddBookViewModel(
             (currentSubgenre ?: form?.subgenre)?.takeIf { it.isNotBlank() }
         )
 
+        val detectedSU = com.gideon.buecherwelt.domain.analysis.SeriesUniverseDetector.detect(
+            title = title,
+            subtitle = subtitle,
+            author = author,
+            description = description,
+            existingSeries = _state.value.seriesNames,
+            existingUniverses = _state.value.universeNames
+        )
+
         val localFallback = com.gideon.buecherwelt.domain.analysis.ReadingStatsCalculator
             .inferBookIntelligence(
-                title = title,
-                description = description,
+                title = "$title $subtitle".trim(),
+                description = "$description $author ${detectedSU.seriesName} ${detectedSU.universeName}",
                 categories = categories,
                 catalog = _state.value.allTropes
+            ).copy(
+                seriesName = detectedSU.seriesName,
+                seriesIndex = detectedSU.seriesIndex,
+                universeName = detectedSU.universeName
             )
 
         if (!llmConfig.isConfigured) {
@@ -277,11 +329,17 @@ class AddBookViewModel(
             _state.update { it.copy(suggestionLoading = true, error = null) }
             val suggestion = llmService.suggestTropes(
                 config = llmConfig,
-                title = title,
+                title = "$title $subtitle".trim(),
                 author = author,
                 description = description,
                 categories = categories
-            )
+            )?.let { llmSug ->
+                llmSug.copy(
+                    seriesName = llmSug.seriesName.ifBlank { detectedSU.seriesName },
+                    seriesIndex = llmSug.seriesIndex ?: detectedSU.seriesIndex,
+                    universeName = llmSug.universeName.ifBlank { detectedSU.universeName }
+                )
+            }
             _state.update {
                 it.copy(
                     suggestionLoading = false,
@@ -308,13 +366,27 @@ class AddBookViewModel(
         viewModelScope.launch {
             _state.update { it.copy(saving = true, error = null) }
             val now = System.currentTimeMillis()
+            val autoSU = if (form.seriesName.isBlank() || form.seriesIndex == null || form.universeName.isBlank()) {
+                com.gideon.buecherwelt.domain.analysis.SeriesUniverseDetector.detect(
+                    title = form.title,
+                    subtitle = form.subtitle,
+                    author = form.author,
+                    description = form.description,
+                    existingSeries = _state.value.seriesNames,
+                    existingUniverses = _state.value.universeNames
+                )
+            } else null
+
             val incoming = Book(
                 id = _state.value.editBookId ?: 0L,
                 isbn = isbn?.ifBlank { null },
                 title = form.title.trim(),
+                subtitle = form.subtitle.trim(),
                 author = form.author.trim(),
                 publisher = form.publisher.trim(),
                 publishedYear = form.publishedYear,
+                pageCount = form.pageCount,
+                language = form.language.trim(),
                 description = form.description.trim(),
                 coverUrl = coverUrl,
                 coverPath = coverPath,
@@ -324,8 +396,9 @@ class AddBookViewModel(
                 rating = form.rating,
                 status = form.status,
                 notes = form.notes.trim(),
-                seriesName = form.seriesName.trim(),
-                seriesIndex = form.seriesIndex,
+                seriesName = form.seriesName.trim().ifBlank { autoSU?.seriesName.orEmpty() },
+                seriesIndex = form.seriesIndex ?: autoSU?.seriesIndex,
+                universeName = form.universeName.trim().ifBlank { autoSU?.universeName.orEmpty() },
                 tropes = emptyList(),
                 createdAt = now,
                 updatedAt = now
@@ -372,9 +445,12 @@ class AddBookViewModel(
                 id = 0,
                 isbn = isbn?.ifBlank { null },
                 title = form.title.trim(),
+                subtitle = form.subtitle.trim(),
                 author = form.author.trim(),
                 publisher = form.publisher.trim(),
                 publishedYear = form.publishedYear,
+                pageCount = form.pageCount,
+                language = form.language.trim(),
                 description = form.description.trim(),
                 coverUrl = coverUrl,
                 coverPath = coverPath,
@@ -385,7 +461,8 @@ class AddBookViewModel(
                 status = form.status,
                 notes = form.notes.trim(),
                 seriesName = form.seriesName.trim(),
-                seriesIndex = form.seriesIndex
+                seriesIndex = form.seriesIndex,
+                universeName = form.universeName.trim()
             )
             val tropeIds = tropeRepository.resolveIds(form.selectedTropes)
             val merged = bookRepository.merge(existing, incoming, tropeIds)

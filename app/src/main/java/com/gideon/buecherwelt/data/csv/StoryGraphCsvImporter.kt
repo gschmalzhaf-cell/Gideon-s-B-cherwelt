@@ -63,6 +63,9 @@ class StoryGraphCsvImporter(
         val messages = mutableListOf<String>()
         var imported = 0
         var skipped = 0
+        val catalog = tropeRepository.getAll()
+        val existingSeries = bookRepository.seriesNames().toMutableList()
+        val existingUniverses = bookRepository.universeNames().toMutableList()
         rows.forEachIndexed { index, row ->
             onProgress(Progress(index + 1, rows.size, row.title, imported, skipped))
             try {
@@ -79,9 +82,26 @@ class StoryGraphCsvImporter(
                         else -> Unit
                     }
                 }
-                if (metadata == null && row.title.isNotBlank()) {
+                if ((metadata == null || metadata.coverUrl.isNullOrBlank() || metadata.description.isBlank()) && row.title.isNotBlank()) {
                     when (val result = fetcher.findByTitleAuthor(row.title, row.author)) {
-                        is FetchResult.Success -> metadata = result.metadata
+                        is FetchResult.Success -> {
+                            val byTitle = result.metadata
+                            metadata = if (metadata == null) {
+                                byTitle
+                            } else {
+                                metadata.copy(
+                                    subtitle = metadata.subtitle.ifBlank { byTitle.subtitle },
+                                    publisher = metadata.publisher.ifBlank { byTitle.publisher },
+                                    publishedYear = metadata.publishedYear ?: byTitle.publishedYear,
+                                    description = metadata.description.ifBlank { byTitle.description },
+                                    categories = metadata.categories.ifEmpty { byTitle.categories },
+                                    coverUrl = metadata.coverUrl ?: byTitle.coverUrl,
+                                    pageCount = metadata.pageCount ?: byTitle.pageCount,
+                                    language = metadata.language.ifBlank { byTitle.language },
+                                    seriesHints = (metadata.seriesHints + byTitle.seriesHints).distinct()
+                                )
+                            }
+                        }
                         else -> Unit
                     }
                 }
@@ -90,31 +110,64 @@ class StoryGraphCsvImporter(
                     title = row.title,
                     author = row.author
                 )
-                val coverPath = base.coverUrl?.let {
-                    coverCache.download(it, CoverCache.keyFor(base.isbn, base.title, base.author))
+                val effectiveIsbn = (base.isbn ?: row.isbn)?.ifBlank { null }
+                val coverPath = coverCache.downloadWithFallback(
+                    primaryUrl = base.coverUrl,
+                    isbn = effectiveIsbn,
+                    key = CoverCache.keyFor(effectiveIsbn, base.title.ifBlank { row.title }, base.author.ifBlank { row.author })
+                )
+                val finalTitle = base.title.ifBlank { row.title }
+                val finalAuthor = base.author.ifBlank { row.author }
+                val detectedSU = com.gideon.buecherwelt.domain.analysis.SeriesUniverseDetector.detect(
+                    title = row.title.ifBlank { finalTitle },
+                    subtitle = base.subtitle,
+                    author = finalAuthor,
+                    description = base.description,
+                    apiSeries = base.seriesHints,
+                    existingSeries = existingSeries,
+                    existingUniverses = existingUniverses
+                )
+                if (detectedSU.seriesName.isNotBlank() && detectedSU.seriesName !in existingSeries) {
+                    existingSeries += detectedSU.seriesName
                 }
+                if (detectedSU.universeName.isNotBlank() && detectedSU.universeName !in existingUniverses) {
+                    existingUniverses += detectedSU.universeName
+                }
+                val inferred = com.gideon.buecherwelt.domain.analysis.ReadingStatsCalculator.inferBookIntelligence(
+                    title = "$finalTitle ${base.subtitle}".trim(),
+                    description = "${base.description} $finalAuthor ${detectedSU.seriesName} ${detectedSU.universeName}",
+                    categories = base.categories,
+                    catalog = catalog
+                )
                 val now = System.currentTimeMillis()
                 val book = Book(
                     id = 0,
-                    isbn = (base.isbn ?: row.isbn)?.ifBlank { null },
-                    title = base.title.ifBlank { row.title },
-                    author = base.author.ifBlank { row.author },
+                    isbn = effectiveIsbn,
+                    title = finalTitle,
+                    subtitle = base.subtitle,
+                    author = finalAuthor,
                     publisher = base.publisher,
                     publishedYear = base.publishedYear,
                     description = base.description,
                     coverUrl = base.coverUrl,
                     coverPath = coverPath,
-                    genre = base.categories.firstOrNull().orEmpty(),
-                    subgenre = "",
-                    spiceLevel = null,
+                    genre = base.categories.firstOrNull() ?: inferred.genres.firstOrNull().orEmpty(),
+                    subgenre = base.categories.getOrNull(1) ?: inferred.genres.getOrNull(1).orEmpty(),
+                    spiceLevel = inferred.spice,
                     rating = row.rating,
                     status = row.status,
                     notes = "",
+                    seriesName = detectedSU.seriesName,
+                    seriesIndex = detectedSU.seriesIndex,
+                    universeName = detectedSU.universeName,
+                    pageCount = base.pageCount,
+                    language = base.language,
                     tropes = emptyList(),
                     createdAt = now,
                     updatedAt = now
                 )
-                val tropeIds = tropeRepository.resolveIds(row.tags)
+                val allTropeNames = (row.tags + inferred.tropes.take(6)).distinct()
+                val tropeIds = tropeRepository.resolveIds(allTropeNames)
                 bookRepository.insert(book, tropeIds)
                 imported++
             } catch (e: Exception) {

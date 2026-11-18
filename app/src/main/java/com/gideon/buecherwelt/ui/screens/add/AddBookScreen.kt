@@ -103,9 +103,12 @@ fun AddBookScreen(
     var isbn by remember { mutableStateOf("") }
     val formInit = state.formInit
     var title by remember(formInit) { mutableStateOf(formInit?.title ?: "") }
+    var subtitle by remember(formInit) { mutableStateOf(formInit?.subtitle ?: "") }
     var author by remember(formInit) { mutableStateOf(formInit?.author ?: "") }
     var publisher by remember(formInit) { mutableStateOf(formInit?.publisher ?: "") }
     var yearText by remember(formInit) { mutableStateOf(formInit?.publishedYear?.toString() ?: "") }
+    var pageCountText by remember(formInit) { mutableStateOf(formInit?.pageCount?.toString() ?: "") }
+    var language by remember(formInit) { mutableStateOf(formInit?.language ?: "") }
     var description by remember(formInit) { mutableStateOf(formInit?.description ?: "") }
     var genre by remember(formInit) { mutableStateOf(formInit?.genre ?: "") }
     var subgenre by remember(formInit) { mutableStateOf(formInit?.subgenre ?: "") }
@@ -115,6 +118,7 @@ fun AddBookScreen(
     var notes by remember(formInit) { mutableStateOf(formInit?.notes ?: "") }
     var seriesName by remember(formInit) { mutableStateOf(formInit?.seriesName ?: "") }
     var seriesIndexText by remember(formInit) { mutableStateOf(formInit?.seriesIndex?.toString() ?: "") }
+    var universeName by remember(formInit) { mutableStateOf(formInit?.universeName ?: "") }
     var coverUrl by remember(formInit) { mutableStateOf(formInit?.coverUrl) }
     var coverPath by remember(formInit) { mutableStateOf(formInit?.coverPath) }
     var selectedTropes by remember(formInit) { mutableStateOf(formInit?.tropes ?: emptySet()) }
@@ -173,9 +177,12 @@ fun AddBookScreen(
 
     fun currentForm(): BookForm = BookForm(
         title = title,
+        subtitle = subtitle,
         author = author,
         publisher = publisher,
         publishedYear = yearText.trim().toIntOrNull(),
+        pageCount = pageCountText.trim().toIntOrNull(),
+        language = language,
         description = description,
         genre = genre,
         subgenre = subgenre,
@@ -185,6 +192,7 @@ fun AddBookScreen(
         notes = notes,
         seriesName = seriesName,
         seriesIndex = seriesIndexText.trim().toIntOrNull(),
+        universeName = universeName,
         selectedTropes = selectedTropes
     )
 
@@ -311,58 +319,129 @@ fun AddBookScreen(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
-                        if (editBookId != null) {
-                            Spacer(Modifier.height(4.dp))
-                            OutlinedButton(onClick = { coverPickerLauncher.launch("image/*") }) {
-                                Icon(Icons.Default.Image, contentDescription = null, modifier = Modifier.size(16.dp))
-                                Spacer(Modifier.width(6.dp))
-                                Text("Cover ändern")
-                            }
+                        Spacer(Modifier.height(4.dp))
+                        OutlinedButton(onClick = { coverPickerLauncher.launch("image/*") }) {
+                            Icon(Icons.Default.Image, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("Cover ändern")
                         }
                     }
                 }
             }
 
             AppTextField(value = title, onValueChange = { title = it }, label = { Text("Titel *") }, modifier = Modifier.fillMaxWidth())
+            AppTextField(value = subtitle, onValueChange = { subtitle = it }, label = { Text("Untertitel") }, modifier = Modifier.fillMaxWidth())
             AppTextField(value = author, onValueChange = { author = it }, label = { Text("Autor:in") }, modifier = Modifier.fillMaxWidth())
             AppTextField(value = publisher, onValueChange = { publisher = it }, label = { Text("Verlag") }, modifier = Modifier.fillMaxWidth())
-            AppTextField(
-                value = yearText,
-                onValueChange = { yearText = it.filter { c -> c.isDigit() }.take(4) },
-                label = { Text("Erscheinungsjahr") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth()
-            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                AppTextField(
+                    value = yearText,
+                    onValueChange = { yearText = it.filter { c -> c.isDigit() }.take(4) },
+                    label = { Text("Erscheinungsjahr") },
+                    singleLine = true,
+                    modifier = Modifier.weight(1f)
+                )
+                AppTextField(
+                    value = pageCountText,
+                    onValueChange = { pageCountText = it.filter { c -> c.isDigit() }.take(5) },
+                    label = { Text("Seitenzahl") },
+                    singleLine = true,
+                    modifier = Modifier.weight(1f)
+                )
+            }
             AppTextField(value = genre, onValueChange = { genre = it }, label = { Text("Genre") }, modifier = Modifier.fillMaxWidth())
             AppTextField(value = subgenre, onValueChange = { subgenre = it }, label = { Text("Subgenre") }, modifier = Modifier.fillMaxWidth())
-            AppTextField(
-                value = seriesName,
-                onValueChange = { seriesName = it },
-                label = { Text("Serie / Reihe (z. B. „Fourth-Wing-Reihe“)") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth()
-            )
-            if (state.seriesNames.isNotEmpty()) {
-                FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp),
-                    modifier = Modifier.padding(top = 4.dp)
+
+            // Buchreihe, Band & Universum (separat erfasst + automatische Erkennung)
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    state.seriesNames.forEach { name ->
-                        AssistChip(
-                            onClick = { seriesName = name },
-                            label = { Text(name) }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("Buchreihe, Band & Universum", style = MaterialTheme.typography.labelLarge)
+                        TextButton(
+                            onClick = {
+                                val detected = com.gideon.buecherwelt.domain.analysis.SeriesUniverseDetector.detect(
+                                    title = title,
+                                    subtitle = subtitle,
+                                    author = author,
+                                    description = description,
+                                    existingSeries = state.seriesNames,
+                                    existingUniverses = state.universeNames
+                                )
+                                if (detected.seriesName.isNotBlank()) seriesName = detected.seriesName
+                                if (detected.seriesIndex != null) seriesIndexText = detected.seriesIndex.toString()
+                                if (detected.universeName.isNotBlank()) universeName = detected.universeName
+                            },
+                            enabled = title.isNotBlank() || description.isNotBlank()
+                        ) {
+                            Text("Automatisch erkennen")
+                        }
+                    }
+
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                        AppTextField(
+                            value = seriesName,
+                            onValueChange = { seriesName = it },
+                            label = { Text("Buchreihe / Serie") },
+                            singleLine = true,
+                            modifier = Modifier.weight(2f)
                         )
+                        AppTextField(
+                            value = seriesIndexText,
+                            onValueChange = { seriesIndexText = it.filter { c -> c.isDigit() }.take(3) },
+                            label = { Text("Band Nr.") },
+                            singleLine = true,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                    if (state.seriesNames.isNotEmpty()) {
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            state.seriesNames.take(8).forEach { name ->
+                                AssistChip(
+                                    onClick = { seriesName = name },
+                                    label = { Text(name) }
+                                )
+                            }
+                        }
+                    }
+
+                    AppTextField(
+                        value = universeName,
+                        onValueChange = { universeName = it },
+                        label = { Text("Buch-Universum / Welt (z. B. „Grishaverse“, „Maasverse“)") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    if (state.universeNames.isNotEmpty()) {
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            state.universeNames.take(8).forEach { uni ->
+                                AssistChip(
+                                    onClick = { universeName = uni },
+                                    label = { Text(uni) }
+                                )
+                            }
+                        }
                     }
                 }
             }
-            AppTextField(
-                value = seriesIndexText,
-                onValueChange = { seriesIndexText = it.filter { c -> c.isDigit() }.take(3) },
-                label = { Text("Band / Nr. in der Serie") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth()
-            )
+
             AppTextField(
                 value = description,
                 onValueChange = { description = it },
@@ -407,6 +486,7 @@ fun AddBookScreen(
                 onClick = {
                     viewModel.suggestTropes(
                         currentTitle = title,
+                        currentSubtitle = subtitle,
                         currentAuthor = author,
                         currentDescription = description,
                         currentGenre = genre,
@@ -420,13 +500,19 @@ fun AddBookScreen(
                     Spacer(Modifier.width(8.dp))
                 }
                 Text(
-                    if (state.llmConfigured) "Tropes & Spice intelligent erkennen (KI + Klappentext)"
-                    else "Tropes & Spice intelligent aus Klappentext erkennen"
+                    if (state.llmConfigured) "Tropes, Reihe & Spice intelligent erkennen (KI + Klappentext)"
+                    else "Tropes, Reihe & Spice intelligent aus Klappentext erkennen"
                 )
             }
             if (state.suggestions != null) {
+                val sug = state.suggestions!!
+                LaunchedEffect(sug) {
+                    if (seriesName.isBlank() && sug.seriesName.isNotBlank()) seriesName = sug.seriesName
+                    if (seriesIndexText.isBlank() && sug.seriesIndex != null) seriesIndexText = sug.seriesIndex.toString()
+                    if (universeName.isBlank() && sug.universeName.isNotBlank()) universeName = sug.universeName
+                }
                 SuggestionChips(
-                    suggestions = state.suggestions!!,
+                    suggestions = sug,
                     selectedTropes = selectedTropes,
                     onTropeToggle = { t ->
                         selectedTropes = if (t in selectedTropes) selectedTropes - t else selectedTropes + t

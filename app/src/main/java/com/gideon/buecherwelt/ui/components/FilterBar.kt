@@ -54,6 +54,9 @@ fun FilterBar(
     seriesNames: List<String> = emptyList(),
     selectedSeries: String? = null,
     onSeriesChange: (String?) -> Unit = {},
+    universeNames: List<String> = emptyList(),
+    selectedUniverse: String? = null,
+    onUniverseChange: (String?) -> Unit = {},
     sortOrder: LibrarySortOrder = LibrarySortOrder.RECENT,
     onSortOrderChange: (LibrarySortOrder) -> Unit = {},
     modifier: Modifier = Modifier
@@ -62,7 +65,7 @@ fun FilterBar(
         TextField(
             value = query,
             onValueChange = onQueryChange,
-            placeholder = { Text("Titel, Autor:in, Serie, Trope, Notiz oder ISBN…") },
+            placeholder = { Text("Titel, Autor:in, Reihe, Universum, Trope oder ISBN…") },
             leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
             trailingIcon = if (query.isNotEmpty()) {
                 {
@@ -110,10 +113,19 @@ fun FilterBar(
             )
             if (seriesNames.isNotEmpty()) {
                 FilterDropdown(
-                    label = "Serie",
+                    label = "Reihe",
                     options = seriesNames,
                     selected = selectedSeries,
                     onSelected = onSeriesChange,
+                    display = { it }
+                )
+            }
+            if (universeNames.isNotEmpty()) {
+                FilterDropdown(
+                    label = "Universum",
+                    options = universeNames,
+                    selected = selectedUniverse,
+                    onSelected = onUniverseChange,
                     display = { it }
                 )
             }

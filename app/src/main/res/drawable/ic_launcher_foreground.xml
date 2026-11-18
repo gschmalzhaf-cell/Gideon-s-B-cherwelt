@@ -1,25 +1,180 @@
 <?xml version="1.0" encoding="utf-8"?>
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
+
+    <!-- Sanfter Schatten unter dem Buch -->
     <path
-        android:fillColor="#4A2E16"
-        android:pathData="M21.6,35.4 L54,32.1 L54,75.3 L21.6,81.6 Z" />
+        android:fillAlpha="0.42"
+        android:fillColor="#0E0603"
+        android:pathData="M24,74 Q54,79 84,74 L81,78 Q54,83 27,78 Z" />
+
+    <!-- Holz-Lesepult / Bücherregal-Leiste mit Goldkante -->
     <path
-        android:fillColor="#4A2E16"
-        android:pathData="M86.4,35.4 L54,32.1 L54,75.3 L86.4,81.6 Z" />
+        android:fillColor="#5A331C"
+        android:pathData="M23,71.5 L85,71.5 L83,75.2 L25,75.2 Z" />
     <path
-        android:fillColor="#FAF5EF"
-        android:pathData="M23.4,36.9 L54,33.9 L54,74.1 L23.4,79.8 Z" />
+        android:fillColor="#D4A84F"
+        android:pathData="M23,71.2 L85,71.2 L85,72.1 L23,72.1 Z" />
+
+    <!-- Ledereinband (Dunkelrot-Mahagoni mit Goldkante) -->
     <path
-        android:fillColor="#FAF5EF"
-        android:pathData="M84.6,36.9 L54,33.9 L54,74.1 L84.6,79.8 Z" />
+        android:fillColor="#6B221B"
+        android:pathData="M24.5,41.5 Q39,38.5 54,44 Q69,38.5 83.5,41.5 L81.8,70.8 Q68,67.5 54,72.2 Q40,67.5 26.2,70.8 Z"
+        android:strokeWidth="1.0"
+        android:strokeColor="#DFB760" />
+
+    <!-- Untere Buchblock-Schicht (Elfenbein-Pergament) -->
     <path
-        android:fillColor="#C89B3C"
-        android:pathData="M55.8,35.4 L63,36 L63,59.4 L59.4,55.4 L55.8,59.4 Z" />
+        android:fillColor="#E5D3B3"
+        android:pathData="M26.5,39.2 Q40,35.8 54,42.2 Q68,35.8 81.5,39.2 L80.2,68.2 Q67,64.8 54,70.2 Q41,64.8 27.8,68.2 Z" />
+
+    <!-- Obere aufgeschlagene Pergament-Seiten (Links) -->
     <path
-        android:fillColor="#5D6B3F"
-        android:pathData="M72.6,20.7 L74.4,23.8 L78.9,24.6 L74.4,26.4 L72.6,32.7 L70.8,26.4 L67.3,24.6 L70.8,23.8 Z" />
+        android:pathData="M28,36.8 Q41,33.2 54,40.5 L54,68.4 Q41,62.4 29,65.6 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:startX="28"
+                android:startY="50"
+                android:endX="54"
+                android:endY="50"
+                android:type="linear">
+                <item android:offset="0.0" android:color="#FDF8EE" />
+                <item android:offset="0.78" android:color="#F6EBD6" />
+                <item android:offset="1.0" android:color="#DEC9A6" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Obere aufgeschlagene Pergament-Seiten (Rechts) -->
+    <path
+        android:pathData="M80,36.8 Q67,33.2 54,40.5 L54,68.4 Q67,62.4 79,65.6 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:startX="54"
+                android:startY="50"
+                android:endX="80"
+                android:endY="50"
+                android:type="linear">
+                <item android:offset="0.0" android:color="#D9C39E" />
+                <item android:offset="0.22" android:color="#F6EBD6" />
+                <item android:offset="1.0" android:color="#FDF8EE" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Buchfalz / Mittellinie -->
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M54,40.2 L54,69.5"
+        android:strokeWidth="1.1"
+        android:strokeColor="#8E6842" />
+
+    <!-- Goldene Initiale / Kapitel-Ornament auf der linken Seite -->
+    <path
+        android:fillColor="#C89636"
+        android:pathData="M33.2,41.8 L39.2,41.0 L39.2,47.0 L33.2,47.8 Z" />
+    <path
+        android:fillColor="#FFF6E0"
+        android:pathData="M35.2,42.8 L37.2,42.5 L37.2,46.0 L35.2,46.3 Z" />
+
+    <!-- Feine Textzeilen auf der linken Buchseite -->
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M41.2,42.2 Q46.5,41.8 50.2,43.5"
+        android:strokeWidth="1.1"
+        android:strokeColor="#8C6D4F"
+        android:strokeLineCap="round" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M41.2,45.6 Q46.5,45.2 50.2,46.9"
+        android:strokeWidth="1.1"
+        android:strokeColor="#8C6D4F"
+        android:strokeLineCap="round" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M33.5,50.2 Q42,48.6 50.2,50.8"
+        android:strokeWidth="1.1"
+        android:strokeColor="#8C6D4F"
+        android:strokeLineCap="round" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M33.5,54.0 Q42,52.4 50.2,54.6"
+        android:strokeWidth="1.1"
+        android:strokeColor="#8C6D4F"
+        android:strokeLineCap="round" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M33.5,57.8 Q41,56.5 47.8,58.2"
+        android:strokeWidth="1.1"
+        android:strokeColor="#A48668"
+        android:strokeLineCap="round" />
+
+    <!-- Feine Textzeilen auf der rechten Buchseite -->
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M57.8,43.5 Q66,41.2 74.2,42.6"
+        android:strokeWidth="1.1"
+        android:strokeColor="#8C6D4F"
+        android:strokeLineCap="round" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M57.8,47.2 Q66,44.9 74.2,46.3"
+        android:strokeWidth="1.1"
+        android:strokeColor="#8C6D4F"
+        android:strokeLineCap="round" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M57.8,51.0 Q66,48.7 74.2,50.1"
+        android:strokeWidth="1.1"
+        android:strokeColor="#8C6D4F"
+        android:strokeLineCap="round" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M57.8,54.8 Q65,52.8 72.0,53.9"
+        android:strokeWidth="1.1"
+        android:strokeColor="#A48668"
+        android:strokeLineCap="round" />
+
+    <!-- Kleines Kompass-/Welten-Emblem auf der rechten Seite unten -->
+    <path
+        android:fillColor="#C89636"
+        android:pathData="M66.5,56.2 L67.6,58.8 L70.2,59.9 L67.6,61.0 L66.5,63.6 L65.4,61.0 L62.8,59.9 L65.4,58.8 Z" />
+
+    <!-- Karminrotes Lesezeichen-Bändchen mit Goldkante -->
+    <path
+        android:fillColor="#B3261E"
+        android:pathData="M52.2,68.2 L56.8,68.2 L58.4,81.8 L54.6,78.4 L50.8,81.8 Z"
+        android:strokeWidth="0.55"
+        android:strokeColor="#E8C266" />
+
+    <!-- Magischer Funkenbogen / Bücherwelt-Sterne über dem aufgeschlagenen Buch -->
+    <!-- Großer goldener Hauptstern in der Mitte oben -->
+    <path
+        android:fillColor="#F7DA84"
+        android:pathData="M54,22.5 L55.9,27.8 L61.2,29.7 L55.9,31.6 L54,36.9 L52.1,31.6 L46.8,29.7 L52.1,27.8 Z" />
+    <path
+        android:fillColor="#FFF8E1"
+        android:pathData="M54,25.8 L54.9,28.7 L57.8,29.7 L54.9,30.7 L54,33.6 L53.1,30.7 L50.2,29.7 L53.1,28.7 Z" />
+
+    <!-- Linker Nebenstern -->
+    <path
+        android:fillColor="#E5B955"
+        android:pathData="M39.5,27.0 L40.6,29.8 L43.4,30.9 L40.6,32.0 L39.5,34.8 L38.4,32.0 L35.6,30.9 L38.4,29.8 Z" />
+
+    <!-- Rechter Nebenstern -->
+    <path
+        android:fillColor="#E5B955"
+        android:pathData="M68.5,27.0 L69.6,29.8 L72.4,30.9 L69.6,32.0 L68.5,34.8 L67.4,32.0 L64.6,30.9 L67.4,29.8 Z" />
+
+    <!-- Feine goldene Lichtpunkte -->
+    <path
+        android:fillColor="#F5D77F"
+        android:pathData="M46.5,25.0 A1.2,1.2 0 1,1 46.49,25.0 Z" />
+    <path
+        android:fillColor="#F5D77F"
+        android:pathData="M61.5,25.0 A1.2,1.2 0 1,1 61.49,25.0 Z" />
 </vector>

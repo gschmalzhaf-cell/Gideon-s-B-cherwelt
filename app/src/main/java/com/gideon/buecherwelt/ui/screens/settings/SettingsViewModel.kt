@@ -13,6 +13,7 @@ import com.gideon.buecherwelt.domain.report.AppReportGenerator
 import com.gideon.buecherwelt.domain.repository.BookRepository
 import com.gideon.buecherwelt.domain.repository.TropeRepository
 import com.gideon.buecherwelt.domain.repository.WishlistRepository
+import com.gideon.buecherwelt.domain.usecase.BookEnrichmentService
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -26,7 +27,8 @@ class SettingsViewModel(
     private val settingsRepository: SettingsRepository,
     private val bookRepository: BookRepository,
     private val tropeRepository: TropeRepository,
-    private val wishlistRepository: WishlistRepository
+    private val wishlistRepository: WishlistRepository,
+    private val bookEnrichmentService: BookEnrichmentService
 ) : ViewModel() {
 
     val themeMode: StateFlow<String> = settingsRepository.themeMode
@@ -41,12 +43,39 @@ class SettingsViewModel(
     private val _reportLoading = MutableStateFlow(false)
     val reportLoading: StateFlow<Boolean> = _reportLoading.asStateFlow()
 
+    private val _enriching = MutableStateFlow(false)
+    val enriching: StateFlow<Boolean> = _enriching.asStateFlow()
+
+    private val _enrichStatus = MutableStateFlow<String?>(null)
+    val enrichStatus: StateFlow<String?> = _enrichStatus.asStateFlow()
+
     fun setThemeMode(mode: String) {
         viewModelScope.launch { settingsRepository.setThemeMode(mode) }
     }
 
     fun saveLlmConfig(config: LlmConfig) {
         viewModelScope.launch { settingsRepository.setLlmConfig(config) }
+    }
+
+    fun refreshAllCoversAndDetails() {
+        if (_enriching.value) return
+        viewModelScope.launch {
+            _enriching.value = true
+            _enrichStatus.value = "Starte Abgleich aller Bücher…"
+            try {
+                val summary = bookEnrichmentService.refreshAllBooks(onlyMissingCoversOrDetails = false) { done, total ->
+                    _enrichStatus.value = "Prüfe Bücher ($done/$total)…"
+                }
+                _enrichStatus.value = buildString {
+                    append("${summary.totalChecked} Bücher geprüft")
+                    append(" · ${summary.coversUpdated} Cover geladen")
+                    append(" · ${summary.seriesDetected} Reihen/Universen erkannt")
+                    append(" · ${summary.detailsUpdated} Details/Tropes aktualisiert.")
+                }
+            } finally {
+                _enriching.value = false
+            }
+        }
     }
 
     fun buildReport() {

@@ -11,6 +11,7 @@ import com.gideon.buecherwelt.domain.llm.LlmService
 import com.gideon.buecherwelt.domain.model.Book
 import com.gideon.buecherwelt.domain.repository.BookRepository
 import com.gideon.buecherwelt.domain.repository.TropeRepository
+import com.gideon.buecherwelt.domain.usecase.BookEnrichmentService
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -22,7 +23,7 @@ enum class LibrarySortOrder(val label: String) {
     TITLE("Titel A–Z"),
     AUTHOR("Autor:in"),
     RATING("Bewertung ★"),
-    SERIES("Serie & Band"),
+    SERIES("Reihe & Band"),
     FIT_SCORE("Profil-Match")
 }
 
@@ -35,17 +36,22 @@ data class LibraryUiState(
     val minRating: Int = 0,
     val trope: String? = null,
     val series: String? = null,
+    val universe: String? = null,
     val sortOrder: LibrarySortOrder = LibrarySortOrder.RECENT,
     val genres: List<String> = emptyList(),
     val tropes: List<String> = emptyList(),
     val seriesNames: List<String> = emptyList(),
+    val universeNames: List<String> = emptyList(),
     val semanticQuery: String = "",
     val semanticActive: Boolean = false,
     val semanticLoading: Boolean = false,
     val semanticIds: Set<Long>? = null,
     val semanticExplanation: String? = null,
     val semanticError: String? = null,
-    val llmConfigured: Boolean = false
+    val llmConfigured: Boolean = false,
+    val enriching: Boolean = false,
+    val enrichProgress: Pair<Int, Int>? = null,
+    val enrichMessage: String? = null
 ) {
     val readingBooks: List<Book>
         get() = books.filter { it.status == ReadingStatus.READING }
@@ -58,8 +64,10 @@ data class LibraryUiState(
             val matched = books.filter { book ->
                 val matchesQuery = q.isBlank() ||
                     book.title.contains(q, ignoreCase = true) ||
+                    book.subtitle.contains(q, ignoreCase = true) ||
                     book.author.contains(q, ignoreCase = true) ||
                     book.seriesName.contains(q, ignoreCase = true) ||
+                    book.universeName.contains(q, ignoreCase = true) ||
                     book.genre.contains(q, ignoreCase = true) ||
                     book.subgenre.contains(q, ignoreCase = true) ||
                     book.publisher.contains(q, ignoreCase = true) ||
@@ -74,7 +82,8 @@ data class LibraryUiState(
                     (status == null || book.status == status) &&
                     (minRating == 0 || (book.rating ?: 0) >= minRating) &&
                     (trope == null || book.tropes.any { it.name == trope }) &&
-                    (series == null || book.seriesName.equals(series, ignoreCase = true))
+                    (series == null || book.seriesName.equals(series, ignoreCase = true)) &&
+                    (universe == null || book.universeName.equals(universe, ignoreCase = true))
             }
 
             if (semanticActive && semanticIds != null) {
@@ -97,7 +106,9 @@ data class LibraryUiState(
                         .thenBy { it.title.lowercase() }
                 )
                 LibrarySortOrder.SERIES -> matched.sortedWith(
-                    compareBy<Book> { it.seriesName.ifBlank { "zzz" }.lowercase() }
+                    compareBy<Book> {
+                        it.seriesName.ifBlank { it.universeName.ifBlank { "zzz" } }.lowercase()
+                    }
                         .thenBy { it.seriesIndex ?: Int.MAX_VALUE }
                         .thenBy { it.title.lowercase() }
                 )
@@ -114,7 +125,8 @@ class LibraryViewModel(
     private val bookRepository: BookRepository,
     tropeRepository: TropeRepository,
     private val llmService: LlmService,
-    settingsRepository: SettingsRepository
+    settingsRepository: SettingsRepository,
+    private val bookEnrichmentService: BookEnrichmentService
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(LibraryUiState())
@@ -143,7 +155,11 @@ class LibraryViewModel(
                         seriesNames = books.map { b -> b.seriesName }
                             .filter { s -> s.isNotBlank() }
                             .distinct()
-                            .sortedBy { s -> s.lowercase() }
+                            .sortedBy { s -> s.lowercase() },
+                        universeNames = books.map { b -> b.universeName }
+                            .filter { u -> u.isNotBlank() }
+                            .distinct()
+                            .sortedBy { u -> u.lowercase() }
                     )
                 }
             }
@@ -156,6 +172,9 @@ class LibraryViewModel(
                 }
             }
         }
+        viewModelScope.launch {
+            bookEnrichmentService.ensureLibraryEnrichedInBackground()
+        }
     }
 
     fun setQuery(query: String) = _state.update { it.copy(query = query) }
@@ -164,9 +183,41 @@ class LibraryViewModel(
     fun setMinRating(rating: Int) = _state.update { it.copy(minRating = rating) }
     fun setTrope(trope: String?) = _state.update { it.copy(trope = trope) }
     fun setSeries(series: String?) = _state.update { it.copy(series = series) }
+    fun setUniverse(universe: String?) = _state.update { it.copy(universe = universe) }
     fun setSortOrder(order: LibrarySortOrder) = _state.update { it.copy(sortOrder = order) }
 
     fun setSemanticQuery(query: String) = _state.update { it.copy(semanticQuery = query) }
+
+    fun refreshLibraryCoversAndDetails() {
+        if (_state.value.enriching) return
+        viewModelScope.launch {
+            _state.update {
+                it.copy(
+                    enriching = true,
+                    enrichProgress = 0 to it.books.size,
+                    enrichMessage = "Prüfe Cover, Reihen, Universen & Buchdetails…"
+                )
+            }
+            val summary = bookEnrichmentService.refreshAllBooks(onlyMissingCoversOrDetails = false) { done, total ->
+                _state.update { it.copy(enrichProgress = done to total) }
+            }
+            val msg = buildString {
+                append("${summary.totalChecked} Bücher geprüft")
+                if (summary.coversUpdated > 0) append(" · ${summary.coversUpdated} Cover geladen")
+                if (summary.seriesDetected > 0) append(" · ${summary.seriesDetected} Reihen/Universen erkannt")
+                if (summary.detailsUpdated > 0) append(" · ${summary.detailsUpdated} Details ergänzt")
+            }
+            _state.update {
+                it.copy(
+                    enriching = false,
+                    enrichProgress = null,
+                    enrichMessage = msg
+                )
+            }
+        }
+    }
+
+    fun dismissEnrichMessage() = _state.update { it.copy(enrichMessage = null) }
 
     fun runSemanticSearch() {
         val query = state.value.semanticQuery.trim()
@@ -216,4 +267,5 @@ class LibraryViewModel(
 
 private fun isbnComparable(s: String): String =
     s.uppercase().filter { it != '-' && !it.isWhitespace() }
+
 

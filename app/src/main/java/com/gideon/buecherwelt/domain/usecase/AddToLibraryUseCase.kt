@@ -11,6 +11,7 @@ class DuplicateBookException(val title: String) : Exception("Buch bereits vorhan
 
 class AddToLibraryUseCase(
     private val bookRepository: BookRepository,
+    private val tropeRepository: com.gideon.buecherwelt.domain.repository.TropeRepository,
     private val metadataFetcher: BookMetadataFetcher,
     private val coverCache: CoverCache
 ) {
@@ -30,10 +31,26 @@ class AddToLibraryUseCase(
         if (duplicate != null) {
             return Result.failure(DuplicateBookException(duplicate.title))
         }
-        val coverPath = metadata.coverUrl?.let {
-            coverCache.download(it, CoverCache.keyFor(metadata.isbn, metadata.title, metadata.author))
-        }
-        val id = bookRepository.insert(metadata.toBook(coverPath), emptySet())
+        val coverPath = coverCache.downloadWithFallback(
+            primaryUrl = metadata.coverUrl,
+            isbn = metadata.isbn,
+            key = CoverCache.keyFor(metadata.isbn, metadata.title, metadata.author)
+        )
+        val catalog = tropeRepository.getAll()
+        val inferred = com.gideon.buecherwelt.domain.analysis.ReadingStatsCalculator.inferBookIntelligence(
+            title = "${metadata.title} ${metadata.subtitle}".trim(),
+            description = "${metadata.description} ${metadata.author}",
+            categories = metadata.categories,
+            catalog = catalog
+        )
+        val baseBook = metadata.toBook(coverPath)
+        val book = baseBook.copy(
+            genre = baseBook.genre.ifBlank { inferred.genres.firstOrNull().orEmpty() },
+            subgenre = baseBook.subgenre.ifBlank { inferred.genres.getOrNull(1).orEmpty() },
+            spiceLevel = inferred.spice
+        )
+        val tropeIds = tropeRepository.resolveIds(inferred.tropes.take(6))
+        val id = bookRepository.insert(book, tropeIds)
         return Result.success(id)
     }
 }

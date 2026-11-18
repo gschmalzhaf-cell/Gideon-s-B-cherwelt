@@ -60,22 +60,26 @@ class BookMetadataFetcher(
                     }
                 }
             }
-            if (ol == null && olSearch == null) {
+            if (olSearch == null) {
                 val doc = olSearchFirst("isbn:$v")
                 if (doc != null && !doc.title.isNullOrBlank()) olSearch = doc.toMetadata()
             }
-            if (gb != null && (ol != null || olSearch != null)) break
+            if (gb != null && ol != null && olSearch != null) break
         }
         var metadata = merge(isbn = isbn, gb = gb, ol = ol, olAuthors = olAuthors)
-        if (metadata.title.isBlank() && olSearch != null) {
+        if (olSearch != null) {
             val s = olSearch!!
             metadata = metadata.copy(
-                title = s.title,
+                title = metadata.title.ifBlank { s.title },
+                subtitle = metadata.subtitle.ifBlank { s.subtitle },
                 author = metadata.author.ifBlank { s.author },
                 publisher = metadata.publisher.ifBlank { s.publisher },
                 publishedYear = metadata.publishedYear ?: s.publishedYear,
                 categories = metadata.categories.ifEmpty { s.categories },
-                coverUrl = metadata.coverUrl ?: s.coverUrl
+                coverUrl = metadata.coverUrl ?: s.coverUrl,
+                pageCount = metadata.pageCount ?: s.pageCount,
+                language = metadata.language.ifBlank { s.language },
+                seriesHints = (metadata.seriesHints + s.seriesHints).distinct()
             )
         }
         if (metadata.title.isBlank()) {
@@ -84,6 +88,7 @@ class BookMetadataFetcher(
                 if (dnb != null && dnb.title.isNotBlank()) {
                     metadata = metadata.copy(
                         title = dnb.title,
+                        subtitle = metadata.subtitle.ifBlank { dnb.subtitle },
                         author = metadata.author.ifBlank { dnb.author },
                         publisher = metadata.publisher.ifBlank { dnb.publisher },
                         publishedYear = metadata.publishedYear ?: dnb.publishedYear,
@@ -93,6 +98,29 @@ class BookMetadataFetcher(
                     break
                 }
             }
+        }
+        // If ISBN lookup found title/author but lacked coverUrl or description, enrich via title+author search!
+        if (metadata.title.isNotBlank() && (metadata.coverUrl.isNullOrBlank() || metadata.description.isBlank())) {
+            val enriched = searchAndRankByTitleAuthor(metadata.title, metadata.author).firstOrNull()
+            if (enriched != null) {
+                metadata = metadata.copy(
+                    subtitle = metadata.subtitle.ifBlank { enriched.subtitle },
+                    author = metadata.author.ifBlank { enriched.author },
+                    publisher = metadata.publisher.ifBlank { enriched.publisher },
+                    publishedYear = metadata.publishedYear ?: enriched.publishedYear,
+                    description = metadata.description.ifBlank { enriched.description },
+                    categories = metadata.categories.ifEmpty { enriched.categories },
+                    coverUrl = metadata.coverUrl ?: enriched.coverUrl,
+                    pageCount = metadata.pageCount ?: enriched.pageCount,
+                    language = metadata.language.ifBlank { enriched.language },
+                    seriesHints = (metadata.seriesHints + enriched.seriesHints).distinct()
+                )
+            }
+        }
+        if (metadata.coverUrl.isNullOrBlank() && metadata.title.isNotBlank()) {
+            metadata = metadata.copy(
+                coverUrl = "https://covers.openlibrary.org/b/isbn/$isbn-L.jpg?default=false"
+            )
         }
         return metadata
     }
@@ -147,11 +175,12 @@ class BookMetadataFetcher(
             event = parser.next()
         }
         if (title.isEmpty()) return null
-        val cleanTitle = title
+        val beforeSlash = title
             .replace(Regex("^\\[[^\\]]*\\]\\s*;\\s*"), "")
             .substringBefore(" / ")
-            .substringBefore(" : ")
             .trim()
+        val cleanTitle = beforeSlash.substringBefore(" : ").trim()
+        val subtitle = if (" : " in beforeSlash) beforeSlash.substringAfter(" : ").trim() else ""
         val cleanAuthor = creator
             .replace(Regex("\\s*\\[[^\\]]*\\]$"), "")
             .let { c -> if (", " in c) c.split(", ", limit = 2).let { (l, f) -> "$f $l" } else c }
@@ -164,6 +193,7 @@ class BookMetadataFetcher(
         return BookMetadata(
             isbn = isbns.firstOrNull { it.length == 13 } ?: isbns.firstOrNull() ?: isbn,
             title = cleanTitle,
+            subtitle = subtitle,
             author = cleanAuthor,
             publisher = cleanPublisher,
             publishedYear = year,
@@ -180,11 +210,15 @@ class BookMetadataFetcher(
     private fun OlDoc.toMetadata(): BookMetadata = BookMetadata(
         isbn = isbn?.firstOrNull { it.length == 13 } ?: isbn?.firstOrNull(),
         title = title ?: "",
+        subtitle = subtitle ?: "",
         author = authorName?.joinToString(", ").orEmpty(),
         publisher = publisher?.firstOrNull().orEmpty(),
         publishedYear = firstPublishYear,
-        categories = subjects?.take(5).orEmpty(),
-        coverUrl = coverId?.let { "https://covers.openlibrary.org/b/id/$it-M.jpg" }
+        categories = subjects?.take(6).orEmpty(),
+        coverUrl = coverId?.takeIf { it > 0 }?.let { "https://covers.openlibrary.org/b/id/$it-L.jpg" },
+        pageCount = numberOfPagesMedian?.takeIf { it > 0 },
+        language = language?.firstOrNull().orEmpty(),
+        seriesHints = series.orEmpty()
     )
 
     suspend fun search(query: String, maxResults: Int = 20): List<BookMetadata> = try {
@@ -198,7 +232,7 @@ class BookMetadataFetcher(
                 "id_amazon:" + candidates.first { it.first == IdentifierKind.ASIN }.second
             candidates.any { it.first == IdentifierKind.GOODREADS } ->
                 "id_goodreads:" + candidates.first { it.first == IdentifierKind.GOODREADS }.second
-            else -> query
+            else -> query.replace("intitle:", "").replace("inauthor:", "")
         }
         val gb = callApi { googleBooksApi.search(gbQuery, maxResults) }?.items.orEmpty()
         val ol = callApi { openLibraryApi.search(olQuery, maxResults) }?.docs.orEmpty()
@@ -211,16 +245,96 @@ class BookMetadataFetcher(
         emptyList()
     }
 
-    suspend fun findByTitleAuthor(title: String, author: String): FetchResult = try {
-        val q = buildString {
-            append("intitle:${title.trim()}")
-            if (author.isNotBlank()) append(" inauthor:${author.trim()}")
+    private suspend fun searchAndRankByTitleAuthor(
+        title: String,
+        author: String,
+        maxResults: Int = 12
+    ): List<BookMetadata> {
+        val cleanTitle = title.trim()
+        if (cleanTitle.isBlank()) return emptyList()
+        val baseTitle = stripSeriesFromTitle(cleanTitle)
+        val cleanAuthor = author.trim()
+        val primaryAuthor = cleanAuthor.substringBefore(",").substringBefore("&").trim()
+
+        val allCandidates = mutableListOf<BookMetadata>()
+
+        // 1. Google Books precise query
+        val gbPreciseQuery = buildString {
+            append("intitle:\"$baseTitle\"")
+            if (primaryAuthor.isNotBlank()) append(" inauthor:\"$primaryAuthor\"")
         }
-        val results = search(q, 5)
-        val best = results.firstOrNull { it.title.isNotBlank() }
-        if (best != null) return FetchResult.Success(best)
+        val gbPrecise = callApi { googleBooksApi.search(gbPreciseQuery, maxResults) }
+            ?.items.orEmpty()
+            .mapNotNull { it.volumeInfo?.let { v -> toMetadata(null, v) } }
+        allCandidates += gbPrecise
+
+        // 2. Google Books broader query (if precise had few results or none with cover)
+        if (allCandidates.none { !it.coverUrl.isNullOrBlank() } || allCandidates.size < 3) {
+            val gbBroadQuery = buildString {
+                append(baseTitle)
+                if (primaryAuthor.isNotBlank()) append(" $primaryAuthor")
+            }
+            val gbBroad = callApi { googleBooksApi.search(gbBroadQuery, maxResults) }
+                ?.items.orEmpty()
+                .mapNotNull { it.volumeInfo?.let { v -> toMetadata(null, v) } }
+            allCandidates += gbBroad
+        }
+
+        // 3. Open Library dedicated title + author search
+        val olDocs = callApi {
+            openLibraryApi.searchByTitleAuthor(
+                title = baseTitle,
+                author = primaryAuthor.ifBlank { null },
+                limit = 10
+            )
+        }?.docs.orEmpty().map { it.toMetadata() }
+        allCandidates += olDocs
+
+        if (allCandidates.isEmpty()) return emptyList()
+
+        val scored = allCandidates
+            .filter { it.title.isNotBlank() }
+            .map { candidate -> candidate to scoreCandidate(candidate, cleanTitle, baseTitle, primaryAuthor) }
+            .filter { it.second > -30 }
+            .sortedByDescending { it.second }
+
+        if (scored.isEmpty()) return emptyList()
+
+        // Merge top candidate with best cover and best description from same-book editions
+        val ranked = scored.map { it.first }
+        val top = ranked.first()
+        val bestCover = ranked.firstOrNull { !it.coverUrl.isNullOrBlank() }?.coverUrl
+        val bestDesc = ranked.firstOrNull { it.description.length > top.description.length }?.description ?: top.description
+        val bestSubtitle = ranked.firstOrNull { it.subtitle.isNotBlank() }?.subtitle ?: top.subtitle
+        val bestPages = ranked.firstOrNull { (it.pageCount ?: 0) > 0 }?.pageCount ?: top.pageCount
+        val bestYear = top.publishedYear ?: ranked.firstOrNull { it.publishedYear != null }?.publishedYear
+        val bestPublisher = top.publisher.ifBlank { ranked.firstOrNull { it.publisher.isNotBlank() }?.publisher.orEmpty() }
+        val bestCategories = (top.categories + ranked.flatMap { it.categories }).distinct().take(6)
+        val bestSeriesHints = ranked.flatMap { it.seriesHints }.distinct()
+
+        val mergedTop = top.copy(
+            coverUrl = top.coverUrl ?: bestCover,
+            description = bestDesc,
+            subtitle = top.subtitle.ifBlank { bestSubtitle },
+            pageCount = bestPages,
+            publishedYear = bestYear,
+            publisher = bestPublisher,
+            categories = bestCategories,
+            seriesHints = bestSeriesHints
+        )
+
+        return listOf(mergedTop) + ranked.drop(1)
+    }
+
+    suspend fun findByTitleAuthor(title: String, author: String): FetchResult = try {
+        val ranked = searchAndRankByTitleAuthor(title, author)
+        val best = ranked.firstOrNull()
+        if (best != null && (!best.coverUrl.isNullOrBlank() || best.description.isNotBlank())) {
+            return FetchResult.Success(best)
+        }
+        val baseTitle = stripSeriesFromTitle(title.trim())
         val cql = buildString {
-            append("tit=\"${title.trim().replace("\"", "")}\"")
+            append("tit=\"${baseTitle.replace("\"", "")}\"")
             if (author.isNotBlank()) append(" and per=\"${author.trim().replace("\"", "")}\"")
         }
         val dnb = fetchDnbQuery(cql)
@@ -230,13 +344,130 @@ class BookMetadataFetcher(
                 val byIsbn = fetchByIdentifier(isbn)
                 if (byIsbn is FetchResult.Success) return byIsbn
             }
-            return FetchResult.Success(dnb)
+            return FetchResult.Success(
+                if (best != null) {
+                    dnb.copy(
+                        coverUrl = dnb.coverUrl ?: best.coverUrl,
+                        description = dnb.description.ifBlank { best.description },
+                        pageCount = dnb.pageCount ?: best.pageCount,
+                        seriesHints = (dnb.seriesHints + best.seriesHints).distinct()
+                    )
+                } else dnb
+            )
         }
-        FetchResult.NotFound
+        if (best != null) FetchResult.Success(best) else FetchResult.NotFound
     } catch (e: NoNetworkException) {
         FetchResult.NoNetwork
     } catch (e: Exception) {
         FetchResult.Error(e.message ?: "Unbekannter Fehler.")
+    }
+
+    /**
+     * Liefert mehrere passende Cover-Kandidaten (verschiedene Ausgaben von Google Books & Open Library)
+     * für die manuelle oder automatische Cover-Auswahl auf der Buchdetailseite.
+     */
+    suspend fun findCoverCandidates(
+        title: String,
+        author: String,
+        isbn: String? = null
+    ): List<BookMetadata> = try {
+        val list = mutableListOf<BookMetadata>()
+        if (!isbn.isNullOrBlank()) {
+            when (val byIsbn = fetchByIsbn(isbn)) {
+                is FetchResult.Success -> if (!byIsbn.metadata.coverUrl.isNullOrBlank()) {
+                    list += byIsbn.metadata
+                }
+                else -> Unit
+            }
+            val cleanIsbn = normalizeIsbn(isbn)
+            if (cleanIsbn != null) {
+                list += BookMetadata(
+                    isbn = cleanIsbn,
+                    title = title,
+                    author = author,
+                    publisher = "Open Library ISBN-Cover",
+                    coverUrl = "https://covers.openlibrary.org/b/isbn/$cleanIsbn-L.jpg?default=false"
+                )
+            }
+        }
+        list += searchAndRankByTitleAuthor(title, author, maxResults = 15)
+            .filter { !it.coverUrl.isNullOrBlank() }
+
+        list.distinctBy { it.coverUrl }.take(8)
+    } catch (e: Exception) {
+        emptyList()
+    }
+
+    private fun stripSeriesFromTitle(raw: String): String =
+        raw.replace(Regex("\\s*\\([^()]*\\)\\s*$"), "")
+            .substringBefore(" – Band ")
+            .substringBefore(" - Band ")
+            .substringBefore(": Band ")
+            .substringBefore(" – Teil ")
+            .substringBefore(" - Teil ")
+            .trim()
+            .ifBlank { raw.trim() }
+
+    private fun scoreCandidate(
+        candidate: BookMetadata,
+        fullTitle: String,
+        baseTitle: String,
+        author: String
+    ): Int {
+        var score = 0
+        val candTitle = candidate.title.trim().lowercase()
+        val targetFull = fullTitle.trim().lowercase()
+        val targetBase = baseTitle.trim().lowercase()
+        val candAuthor = candidate.author.trim().lowercase()
+        val targetAuthor = author.trim().lowercase()
+
+        // Reject spam / study guides / summaries if not requested
+        val spamKeywords = listOf(
+            "summary of", "study guide", "workbook", "trivia", "analysis of",
+            "lektürehilfe", "zusammenfassung", "coloring book", "malbuch", "notizbuch"
+        )
+        if (spamKeywords.any { kw -> candTitle.contains(kw) && !targetFull.contains(kw) }) {
+            score -= 120
+        }
+
+        // Title match
+        when {
+            candTitle == targetFull || candTitle == targetBase -> score += 55
+            candTitle.startsWith(targetBase) || targetBase.startsWith(candTitle) -> score += 38
+            candTitle.contains(targetBase) || targetBase.contains(candTitle) -> score += 26
+            else -> {
+                val targetWords = targetBase.split(Regex("\\s+")).filter { it.length >= 3 }
+                if (targetWords.isNotEmpty()) {
+                    val matchedWords = targetWords.count { w -> candTitle.contains(w) }
+                    score += (matchedWords * 25) / targetWords.size
+                }
+            }
+        }
+
+        // Author match
+        if (targetAuthor.isNotBlank()) {
+            val authorTokens = targetAuthor.split(Regex("\\s+")).filter { it.length >= 3 }
+            val lastName = authorTokens.lastOrNull().orEmpty()
+            when {
+                candAuthor.contains(targetAuthor) || targetAuthor.contains(candAuthor) && candAuthor.isNotBlank() -> score += 45
+                lastName.isNotBlank() && candAuthor.contains(lastName) -> score += 35
+                candAuthor.isBlank() -> score -= 10
+                else -> score -= 55
+            }
+        }
+
+        // Cover availability
+        if (!candidate.coverUrl.isNullOrBlank()) {
+            score += 35
+        }
+
+        // Rich metadata bonus
+        if (candidate.description.length > 60) score += 15
+        if ((candidate.pageCount ?: 0) > 0) score += 5
+        if (candidate.categories.isNotEmpty()) score += 5
+        if (candidate.language.equals("de", ignoreCase = true)) score += 6
+
+        return score
     }
 
     private suspend fun <T> callApi(block: suspend () -> T): T? = try {
@@ -255,13 +486,12 @@ class BookMetadataFetcher(
         ol: OlBook?,
         olAuthors: List<String>
     ): BookMetadata {
-        val coverFromGb = gb?.imageLinks?.thumbnail
-            ?.replace("http://", "https://")
-            ?.replace("&edge=curl", "")
-        val coverFromOl = ol?.coverId?.let { "https://covers.openlibrary.org/b/id/$it-L.jpg" }
+        val coverFromGb = gb?.imageLinks?.bestUrl()
+        val coverFromOl = ol?.bestCoverId?.let { "https://covers.openlibrary.org/b/id/$it-L.jpg" }
         return BookMetadata(
             isbn = isbn,
             title = gb?.title?.ifBlank { null } ?: ol?.title.orEmpty(),
+            subtitle = gb?.subtitle?.ifBlank { null } ?: ol?.subtitle.orEmpty(),
             author = gb?.authors?.joinToString(", ")?.ifBlank { null }
                 ?: olAuthors.joinToString(", "),
             publisher = gb?.publisher?.ifBlank { null }
@@ -271,7 +501,10 @@ class BookMetadataFetcher(
             categories = gb?.categories?.take(6)
                 ?: ol?.subjects?.map { it.substringBefore('/') }?.distinct()?.take(6)
                 ?: emptyList(),
-            coverUrl = coverFromGb ?: coverFromOl
+            coverUrl = coverFromGb ?: coverFromOl,
+            pageCount = gb?.pageCount?.takeIf { it > 0 } ?: ol?.numberOfPages?.takeIf { it > 0 },
+            language = gb?.language.orEmpty(),
+            seriesHints = ol?.series.orEmpty()
         )
     }
 
@@ -282,14 +515,15 @@ class BookMetadataFetcher(
         return BookMetadata(
             isbn = isbn ?: isbn13 ?: isbn10,
             title = info.title.orEmpty(),
+            subtitle = info.subtitle.orEmpty(),
             author = info.authors?.joinToString(", ").orEmpty(),
             publisher = info.publisher.orEmpty(),
             publishedYear = parseYear(info.publishedDate),
             description = info.description.orEmpty(),
             categories = info.categories?.take(6).orEmpty(),
-            coverUrl = info.imageLinks?.thumbnail
-                ?.replace("http://", "https://")
-                ?.replace("&edge=curl", "")
+            coverUrl = info.imageLinks?.bestUrl(),
+            pageCount = info.pageCount?.takeIf { it > 0 },
+            language = info.language.orEmpty()
         )
     }
 

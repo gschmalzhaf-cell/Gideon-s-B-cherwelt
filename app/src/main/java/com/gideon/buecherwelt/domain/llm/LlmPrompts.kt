@@ -20,12 +20,15 @@ object LlmPrompts {
         categories: List<String>
     ): Pair<String, String> {
         val system = """
-            Du analysierst Bücher und schlägst passende Book-Tropes vor.
+            Du analysierst Bücher und schlägst passende Book-Tropes sowie Buchreihe, Bandnummer und Buch-Universum vor.
             Antworte AUSSCHLIESSLICH mit einem JSON-Objekt, ohne erklärenden Text:
-            {"tropes": ["..."], "genres": ["..."], "spice": 0}
+            {"tropes": ["..."], "genres": ["..."], "spice": 0, "seriesName": "", "seriesIndex": null, "universeName": ""}
             - "tropes": maximal 8 Namen, exakt so geschrieben wie im Katalog.
             - "genres": 1-3 passende Genre-Bezeichnungen.
             - "spice": ganze Zahl 0-5 (0 = keine Liebesszenen, 5 = sehr explizit / Open Door).
+            - "seriesName": Name der Buchreihe (leer lassen, wenn Einzelband ohne Reihe).
+            - "seriesIndex": Bandnummer als ganze Zahl (z. B. 1, 2, 3) oder null.
+            - "universeName": Name des übergeordneten Buch-Universums / der Buchwelt (z. B. "Grishaverse", "Maasverse", "Schattenjäger-Universum", "Empyrean-Universum"), sonst leer.
         """.trimIndent()
         val catalogText = catalog.joinToString("\n") { "- ${it.name} (${it.category})" }
         val user = """

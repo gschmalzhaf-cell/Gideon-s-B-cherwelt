@@ -38,12 +38,14 @@ class AppContainer(context: Context) {
         .addInterceptor { chain ->
             val request = chain.request()
             val apiKey = BuildConfig.GOOGLE_BOOKS_API_KEY
+            val builder = request.newBuilder()
+                .header("User-Agent", "GideonsBuecherwelt/1.5 (Android)")
             val newRequest = if (apiKey.isNotBlank() && request.url.host == "www.googleapis.com") {
-                request.newBuilder()
+                builder
                     .url(request.url.newBuilder().addQueryParameter("key", apiKey).build())
                     .build()
             } else {
-                request
+                builder.build()
             }
             chain.proceed(newRequest)
         }
@@ -81,7 +83,13 @@ class AppContainer(context: Context) {
     val llmService = LlmService(llmClient, tropeRepository)
     val coverIdentifier = CoverIdentifier(appContext, llmClient, metadataFetcher)
     val recommendationEngine = RecommendationEngine(metadataFetcher)
-    val addToLibrary = AddToLibraryUseCase(bookRepository, metadataFetcher, coverCache)
+    val addToLibrary = AddToLibraryUseCase(bookRepository, tropeRepository, metadataFetcher, coverCache)
+    val bookEnrichmentService = com.gideon.buecherwelt.domain.usecase.BookEnrichmentService(
+        bookRepository = bookRepository,
+        tropeRepository = tropeRepository,
+        metadataFetcher = metadataFetcher,
+        coverCache = coverCache
+    )
 
     val csvImporter = StoryGraphCsvImporter(
         appContext, metadataFetcher, coverCache, bookRepository, tropeRepository

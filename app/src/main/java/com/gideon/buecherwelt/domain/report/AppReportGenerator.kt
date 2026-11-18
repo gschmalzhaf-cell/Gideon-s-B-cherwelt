@@ -40,6 +40,7 @@ object AppReportGenerator {
 
         val statusCounts = ReadingStatus.entries.associateWith { s -> books.count { it.status == s } }
         val seriesCount = books.map { it.seriesName }.filter { it.isNotBlank() }.distinct().size
+        val universeCount = books.map { it.universeName }.filter { it.isNotBlank() }.distinct().size
         val noCover = books.count { it.coverUrl == null && it.coverPath == null }
         val noDescription = books.count { it.description.isBlank() }
         val noGenre = books.count { it.genre.isBlank() }
@@ -72,7 +73,8 @@ object AppReportGenerator {
             ReadingStatus.entries.forEach { s ->
                 appendLine("  - ${s.label}: ${statusCounts[s] ?: 0}")
             }
-            appendLine("- Serien: $seriesCount")
+            appendLine("- Buchreihen: $seriesCount")
+            appendLine("- Buch-Universen: $universeCount")
             appendLine("- Tropes im Katalog: $tropeCount (davon eigene: $customTropeCount)")
             appendLine("- Merkliste: $wishlistCount")
             appendLine()
@@ -121,6 +123,7 @@ object AppReportGenerator {
                     ReadingStatus.entries.forEach { s -> put(s.name, statusCounts[s] ?: 0) }
                 })
                 put("seriesCount", seriesCount)
+                put("universeCount", universeCount)
                 put("tropeCount", tropeCount)
                 put("customTropeCount", customTropeCount)
                 put("wishlistCount", wishlistCount)
@@ -172,6 +175,8 @@ object AppReportGenerator {
                         put("genre", b.genre)
                         put("series", b.seriesName)
                         put("seriesIndex", b.seriesIndex ?: 0)
+                        put("universe", b.universeName)
+                        put("pageCount", b.pageCount ?: 0)
                         put("tropeCount", b.tropes.size)
                         put("hasCover", b.coverUrl != null || b.coverPath != null)
                         put("hasDescription", b.description.isNotBlank())

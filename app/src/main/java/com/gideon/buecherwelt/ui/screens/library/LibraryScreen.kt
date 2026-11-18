@@ -28,6 +28,7 @@ import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.AutoStories
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.MenuBook
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -36,6 +37,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -75,7 +77,8 @@ fun LibraryScreen(
                 container.bookRepository,
                 container.tropeRepository,
                 container.llmService,
-                container.settingsRepository
+                container.settingsRepository,
+                container.bookEnrichmentService
             )
         }
     )
@@ -120,6 +123,24 @@ fun LibraryScreen(
                     }
                 },
                 actions = {
+                    if (state.books.isNotEmpty()) {
+                        IconButton(
+                            onClick = viewModel::refreshLibraryCoversAndDetails,
+                            enabled = !state.enriching
+                        ) {
+                            if (state.enriching) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(18.dp),
+                                    strokeWidth = 2.dp
+                                )
+                            } else {
+                                Icon(
+                                    Icons.Default.Refresh,
+                                    contentDescription = "Cover, Reihen & Buchdetails aktualisieren"
+                                )
+                            }
+                        }
+                    }
                     IconButton(onClick = { navController.navigate(Screen.Settings.route) }) {
                         Icon(Icons.Default.Settings, contentDescription = "Einstellungen")
                     }
@@ -158,10 +179,61 @@ fun LibraryScreen(
                 seriesNames = state.seriesNames,
                 selectedSeries = state.series,
                 onSeriesChange = viewModel::setSeries,
+                universeNames = state.universeNames,
+                selectedUniverse = state.universe,
+                onUniverseChange = viewModel::setUniverse,
                 sortOrder = state.sortOrder,
                 onSortOrderChange = viewModel::setSortOrder,
                 modifier = Modifier.padding(top = 8.dp)
             )
+            if (state.enriching || state.enrichMessage != null) {
+                Surface(
+                    shape = MaterialTheme.shapes.medium,
+                    color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.65f),
+                    modifier = Modifier
+                        .padding(top = 8.dp)
+                        .fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            val progressText = state.enrichProgress?.let { (done, total) ->
+                                "Aktualisiere Bibliothek ($done/$total)…"
+                            } ?: state.enrichMessage.orEmpty()
+                            Text(
+                                text = progressText,
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                modifier = Modifier.weight(1f)
+                            )
+                            if (!state.enriching) {
+                                IconButton(
+                                    onClick = viewModel::dismissEnrichMessage,
+                                    modifier = Modifier.size(22.dp)
+                                ) {
+                                    Icon(
+                                        Icons.Default.Close,
+                                        contentDescription = "Schließen",
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
+                            }
+                        }
+                        val prog = state.enrichProgress
+                        if (state.enriching && prog != null && prog.second > 0) {
+                            LinearProgressIndicator(
+                                progress = { prog.first.toFloat() / prog.second.toFloat() },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(top = 6.dp)
+                            )
+                        }
+                    }
+                }
+            }
             if (state.llmConfigured) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,

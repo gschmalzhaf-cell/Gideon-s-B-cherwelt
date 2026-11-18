@@ -81,16 +81,19 @@ fun BookCard(
                 }
 
                 // Serien-Band-Plakette unten links auf dem Cover
-                if (book.seriesName.isNotBlank()) {
-                    val badgeText = if (book.seriesIndex != null) {
-                        "Bd. ${book.seriesIndex}"
-                    } else {
-                        book.seriesName.take(12)
+                if (book.seriesName.isNotBlank() || book.seriesIndex != null) {
+                    val badgeText = when {
+                        book.seriesIndex != null && book.seriesName.isNotBlank() ->
+                            "Bd. ${book.seriesIndex}"
+                        book.seriesIndex != null ->
+                            "Bd. ${book.seriesIndex}"
+                        else ->
+                            book.seriesName.take(14)
                     }
                     Surface(
-                        color = Color(0xFF211710).copy(alpha = 0.84f),
+                        color = Color(0xFF211710).copy(alpha = 0.86f),
                         shape = CircleShape,
-                        border = BorderStroke(0.5.dp, Color(0xFFDDB968).copy(alpha = 0.7f)),
+                        border = BorderStroke(0.5.dp, Color(0xFFDDB968).copy(alpha = 0.75f)),
                         modifier = Modifier
                             .align(Alignment.BottomStart)
                             .padding(6.dp)
@@ -100,6 +103,24 @@ fun BookCard(
                             style = MaterialTheme.typography.labelSmall,
                             color = Color(0xFFF6DFC6),
                             fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
+                        )
+                    }
+                } else if (book.universeName.isNotBlank()) {
+                    Surface(
+                        color = Color(0xFF211710).copy(alpha = 0.84f),
+                        shape = CircleShape,
+                        border = BorderStroke(0.5.dp, Color(0xFFDDB968).copy(alpha = 0.65f)),
+                        modifier = Modifier
+                            .align(Alignment.BottomStart)
+                            .padding(6.dp)
+                    ) {
+                        Text(
+                            text = book.universeName.take(14),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color(0xFFF6DFC6),
+                            fontWeight = FontWeight.Medium,
                             maxLines = 1,
                             modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
                         )
@@ -157,6 +178,24 @@ fun BookCard(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
+                    )
+                }
+                val seriesOrUniverseLine = buildString {
+                    if (book.seriesName.isNotBlank()) {
+                        append(book.seriesName)
+                        if (book.seriesIndex != null) append(" #${book.seriesIndex}")
+                    } else if (book.universeName.isNotBlank()) {
+                        append(book.universeName)
+                    }
+                }
+                if (seriesOrUniverseLine.isNotBlank()) {
+                    Text(
+                        text = seriesOrUniverseLine,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(top = 1.dp)
                     )
                 }
                 Spacer(modifier = Modifier.height(4.dp))

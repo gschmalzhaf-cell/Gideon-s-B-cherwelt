@@ -19,20 +19,32 @@ data class GbVolume(
 @Serializable
 data class GbVolumeInfo(
     val title: String? = null,
+    val subtitle: String? = null,
     val authors: List<String>? = null,
     val publisher: String? = null,
     @SerialName("publishedDate") val publishedDate: String? = null,
     val description: String? = null,
     val categories: List<String>? = null,
+    val pageCount: Int? = null,
+    val language: String? = null,
     val imageLinks: GbImageLinks? = null,
     @SerialName("industryIdentifiers") val industryIdentifiers: List<GbIdentifier>? = null
 )
 
 @Serializable
 data class GbImageLinks(
+    val extraLarge: String? = null,
+    val large: String? = null,
+    val medium: String? = null,
+    val small: String? = null,
     val thumbnail: String? = null,
     val smallThumbnail: String? = null
-)
+) {
+    fun bestUrl(): String? =
+        (large ?: medium ?: small ?: thumbnail ?: extraLarge ?: smallThumbnail)
+            ?.replace("http://", "https://")
+            ?.replace("&edge=curl", "")
+}
 
 @Serializable
 data class GbIdentifier(

@@ -40,6 +40,20 @@ class BookRepository(
             .distinct()
             .sortedBy { it.lowercase() }
 
+    fun observeUniverseNames(): Flow<List<String>> =
+        observeBooks().map { all ->
+            all.map { it.universeName }
+                .filter { it.isNotBlank() }
+                .distinct()
+                .sortedBy { it.lowercase() }
+        }
+
+    suspend fun universeNames(): List<String> =
+        getAllBooks().map { it.universeName }
+            .filter { it.isNotBlank() }
+            .distinct()
+            .sortedBy { it.lowercase() }
+
     suspend fun findByIsbn(isbn: String): Book? =
         bookDao.findByIsbn(isbn)?.let { BookWithTropes(it).toDomain() }
 
@@ -81,6 +95,7 @@ class BookRepository(
     suspend fun merge(existing: Book, incoming: Book, newTropeIds: Set<Long>): Book {
         val merged = existing.copy(
             title = existing.title.ifBlank { incoming.title },
+            subtitle = existing.subtitle.ifBlank { incoming.subtitle },
             author = existing.author.ifBlank { incoming.author },
             publisher = existing.publisher.ifBlank { incoming.publisher },
             publishedYear = existing.publishedYear ?: incoming.publishedYear,
@@ -93,8 +108,11 @@ class BookRepository(
             rating = existing.rating ?: incoming.rating,
             status = if (existing.status == ReadingStatus.PLANNED) incoming.status else existing.status,
             notes = existing.notes.ifBlank { incoming.notes },
-            seriesName = if (existing.seriesName.isBlank()) incoming.seriesName else existing.seriesName,
+            seriesName = existing.seriesName.ifBlank { incoming.seriesName },
             seriesIndex = existing.seriesIndex ?: incoming.seriesIndex,
+            universeName = existing.universeName.ifBlank { incoming.universeName },
+            pageCount = existing.pageCount ?: incoming.pageCount,
+            language = existing.language.ifBlank { incoming.language },
             updatedAt = System.currentTimeMillis()
         )
         val tropeIds = (existing.tropes.map { it.id } + newTropeIds).toSet()
@@ -106,6 +124,7 @@ class BookRepository(
         id = book.id,
         isbn = book.isbn,
         title = book.title,
+        subtitle = book.subtitle,
         author = book.author,
         publisher = book.publisher,
         publishedYear = book.publishedYear,
@@ -120,6 +139,9 @@ class BookRepository(
         notes = book.notes,
         seriesName = book.seriesName,
         seriesIndex = book.seriesIndex,
+        universeName = book.universeName,
+        pageCount = book.pageCount,
+        language = book.language,
         aiSummary = book.aiSummary,
         aiFitScore = book.aiFitScore,
         aiFitReason = book.aiFitReason,
@@ -133,6 +155,7 @@ class BookRepository(
         id = id,
         isbn = isbn?.ifBlank { null },
         title = title,
+        subtitle = subtitle,
         author = author,
         publisher = publisher,
         publishedYear = publishedYear,
@@ -147,6 +170,9 @@ class BookRepository(
         notes = notes,
         seriesName = seriesName,
         seriesIndex = seriesIndex,
+        universeName = universeName,
+        pageCount = pageCount,
+        language = language,
         aiSummary = aiSummary,
         aiFitScore = aiFitScore,
         aiFitReason = aiFitReason,

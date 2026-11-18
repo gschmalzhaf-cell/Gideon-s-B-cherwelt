@@ -63,7 +63,13 @@ fun BookCover(
         topEnd = cornerRadius,
         bottomEnd = cornerRadius
     )
-    val model: Any? = coverPath?.let { File(it) } ?: coverUrl
+    val validFile = androidx.compose.runtime.remember(coverPath) {
+        if (com.gideon.buecherwelt.data.network.CoverCache.isValidCoverFile(coverPath)) {
+            File(coverPath!!)
+        } else null
+    }
+    val model: Any? = validFile ?: coverUrl?.takeIf { it.isNotBlank() }
+    var imageError by androidx.compose.runtime.remember(model) { androidx.compose.runtime.mutableStateOf(false) }
 
     Box(
         modifier = modifier
@@ -74,80 +80,80 @@ fun BookCover(
                 shape = shape
             )
     ) {
-        if (model != null) {
+        val paletteIndex = abs((title + author).hashCode()) % BookBindingGradients.size
+        val gradientColors = BookBindingGradients[paletteIndex]
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Brush.linearGradient(gradientColors))
+                .padding(horizontal = 8.dp, vertical = 10.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .border(
+                        width = 0.8.dp,
+                        color = Color(0xFFEBD5B3).copy(alpha = 0.4f),
+                        shape = RoundedCornerShape(4.dp)
+                    )
+                    .padding(6.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.AutoStories,
+                        contentDescription = null,
+                        tint = Color(0xFFF6E7C1).copy(alpha = 0.85f),
+                        modifier = Modifier.size(18.dp)
+                    )
+                    if (title.isNotBlank()) {
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            text = title,
+                            style = MaterialTheme.typography.labelMedium,
+                            fontFamily = PlayfairDisplay,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFFFFFBF6),
+                            textAlign = TextAlign.Center,
+                            maxLines = 3,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                    if (author.isNotBlank()) {
+                        Spacer(Modifier.height(3.dp))
+                        HorizontalDivider(
+                            modifier = Modifier.width(24.dp),
+                            thickness = 0.5.dp,
+                            color = Color(0xFFEBD5B3).copy(alpha = 0.5f)
+                        )
+                        Spacer(Modifier.height(3.dp))
+                        Text(
+                            text = author,
+                            style = MaterialTheme.typography.labelSmall,
+                            fontStyle = FontStyle.Italic,
+                            color = Color(0xFFF1DEC9).copy(alpha = 0.9f),
+                            textAlign = TextAlign.Center,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+            }
+        }
+
+        if (model != null && !imageError) {
             AsyncImage(
                 model = model,
                 contentDescription = contentDescription,
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Crop,
-                error = androidx.compose.ui.graphics.vector.rememberVectorPainter(Icons.Default.AutoStories),
-                placeholder = androidx.compose.ui.graphics.vector.rememberVectorPainter(Icons.Default.AutoStories)
+                onError = { imageError = true },
+                onSuccess = { imageError = false }
             )
-        } else {
-            val paletteIndex = abs((title + author).hashCode()) % BookBindingGradients.size
-            val gradientColors = BookBindingGradients[paletteIndex]
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Brush.linearGradient(gradientColors))
-                    .padding(horizontal = 8.dp, vertical = 10.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .border(
-                            width = 0.8.dp,
-                            color = Color(0xFFEBD5B3).copy(alpha = 0.4f),
-                            shape = RoundedCornerShape(4.dp)
-                        )
-                        .padding(6.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.AutoStories,
-                            contentDescription = null,
-                            tint = Color(0xFFF6E7C1).copy(alpha = 0.85f),
-                            modifier = Modifier.size(18.dp)
-                        )
-                        if (title.isNotBlank()) {
-                            Spacer(Modifier.height(4.dp))
-                            Text(
-                                text = title,
-                                style = MaterialTheme.typography.labelMedium,
-                                fontFamily = PlayfairDisplay,
-                                fontWeight = FontWeight.Bold,
-                                color = Color(0xFFFFFBF6),
-                                textAlign = TextAlign.Center,
-                                maxLines = 3,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
-                        if (author.isNotBlank()) {
-                            Spacer(Modifier.height(3.dp))
-                            HorizontalDivider(
-                                modifier = Modifier.width(24.dp),
-                                thickness = 0.5.dp,
-                                color = Color(0xFFEBD5B3).copy(alpha = 0.5f)
-                            )
-                            Spacer(Modifier.height(3.dp))
-                            Text(
-                                text = author,
-                                style = MaterialTheme.typography.labelSmall,
-                                fontStyle = FontStyle.Italic,
-                                color = Color(0xFFF1DEC9).copy(alpha = 0.9f),
-                                textAlign = TextAlign.Center,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
-                    }
-                }
-            }
         }
 
         // Realistischer Buchfalz (Spine-Schatten & Glanzkante links)

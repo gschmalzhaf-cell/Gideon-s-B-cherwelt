@@ -17,6 +17,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BugReport
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -64,7 +65,8 @@ fun SettingsScreen(
                 container.settingsRepository,
                 container.bookRepository,
                 container.tropeRepository,
-                container.wishlistRepository
+                container.wishlistRepository,
+                container.bookEnrichmentService
             )
         }
     )
@@ -72,6 +74,8 @@ fun SettingsScreen(
     val llmConfig by viewModel.llmConfig.collectAsStateWithLifecycle()
     val report by viewModel.report.collectAsStateWithLifecycle()
     val reportLoading by viewModel.reportLoading.collectAsStateWithLifecycle()
+    val enriching by viewModel.enriching.collectAsStateWithLifecycle()
+    val enrichStatus by viewModel.enrichStatus.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
     var apiKey by remember(llmConfig) { mutableStateOf(llmConfig.apiKey) }
@@ -165,6 +169,33 @@ fun SettingsScreen(
             HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp))
 
             SectionHeader("Daten", modifier = Modifier.padding(top = 0.dp))
+            ListItem(
+                headlineContent = { Text("Cover, Buchreihen & Buchdetails aktualisieren") },
+                supportingContent = { Text("Lädt fehlende oder fehlerhafte Buchcover nach, erkennt Buchreihen, Bandnummern & Buch-Universen automatisch und ergänzt Tropes & Buchdetails.") },
+                modifier = Modifier.fillMaxWidth()
+            )
+            OutlinedButton(
+                onClick = { viewModel.refreshAllCoversAndDetails() },
+                enabled = !enriching,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                if (enriching) {
+                    CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                } else {
+                    Icon(Icons.Default.Refresh, contentDescription = null)
+                }
+                Spacer(Modifier.width(8.dp))
+                Text("Alle Cover, Reihen & Buchdetails neu laden")
+            }
+            if (enrichStatus != null) {
+                Text(
+                    enrichStatus!!,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(top = 4.dp, bottom = 8.dp)
+                )
+            }
+
             ListItem(
                 headlineContent = { Text("StoryGraph-CSV importieren") },
                 supportingContent = { Text("Titel, Autor:in, Status, eigene Tags; Buchdaten werden per ISBN/ASIN/Goodreads-ID nachgeladen.") },

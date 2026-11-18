@@ -9,7 +9,10 @@ import kotlinx.serialization.json.jsonPrimitive
 data class TropeSuggestion(
     val tropes: List<String> = emptyList(),
     val genres: List<String> = emptyList(),
-    val spice: Int? = null
+    val spice: Int? = null,
+    val seriesName: String = "",
+    val seriesIndex: Int? = null,
+    val universeName: String = ""
 )
 
 data class LlmBookRecommendation(
@@ -33,7 +36,10 @@ object LlmResponseParser {
                     ?.mapNotNull { it.jsonPrimitive.stringContentOrNull() }?.take(10) ?: emptyList(),
                 genres = obj["genres"]?.jsonArray
                     ?.mapNotNull { it.jsonPrimitive.stringContentOrNull() }?.take(4) ?: emptyList(),
-                spice = obj["spice"]?.jsonPrimitive?.content?.toIntOrNull()?.coerceIn(0, 5)
+                spice = obj["spice"]?.jsonPrimitive?.content?.toIntOrNull()?.coerceIn(0, 5),
+                seriesName = obj["seriesName"]?.jsonPrimitive?.stringContentOrNull()?.trim().orEmpty(),
+                seriesIndex = obj["seriesIndex"]?.jsonPrimitive?.content?.toIntOrNull(),
+                universeName = obj["universeName"]?.jsonPrimitive?.stringContentOrNull()?.trim().orEmpty()
             )
         } catch (e: Exception) {
             null
