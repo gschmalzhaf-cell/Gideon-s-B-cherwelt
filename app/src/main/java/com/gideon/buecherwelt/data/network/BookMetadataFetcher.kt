@@ -8,6 +8,13 @@ import retrofit2.HttpException
 import java.io.IOException
 import java.io.StringReader
 
+sealed interface SearchListResult {
+    data class Success(val items: List<BookMetadata>) : SearchListResult
+    data object Empty : SearchListResult
+    data object NoNetwork : SearchListResult
+    data class Error(val message: String) : SearchListResult
+}
+
 class BookMetadataFetcher(
     private val googleBooksApi: GoogleBooksApi,
     private val openLibraryApi: OpenLibraryApi,
@@ -18,15 +25,15 @@ class BookMetadataFetcher(
         val candidates = classifyIdentifier(raw)
         if (candidates.isEmpty()) {
             return FetchResult.Error(
-                "Ungültige Eingabe – erwartet ISBN (10/13 Zeichen), ASIN (z. B. B0…) oder Goodreads-ID (Zahl)."
+                "Ungültige Eingabe – erwartet ISBN (10/13 Zeichen), ASIN (z. B. B0…), Amazon-Link oder Goodreads-ID (Zahl)."
             )
         }
         return try {
             for ((kind, value) in candidates) {
                 val metadata = when (kind) {
                     IdentifierKind.ISBN -> fetchIsbnMetadata(value)
-                    IdentifierKind.ASIN -> olSearchFirst("id_amazon:$value")?.toMetadata()?.enrichByIsbn()
-                    IdentifierKind.GOODREADS -> olSearchFirst("id_goodreads:$value")?.toMetadata()?.enrichByIsbn()
+                    IdentifierKind.ASIN -> fetchAsinMetadata(value)
+                    IdentifierKind.GOODREADS -> olSearchFirst("id_goodreads:$value")?.toMetadata()?.enrichMetadata()
                 }
                 if (metadata != null && metadata.title.isNotBlank()) return FetchResult.Success(metadata)
             }
@@ -204,8 +211,132 @@ class BookMetadataFetcher(
     private suspend fun olSearchFirst(query: String): OlDoc? =
         callApi { openLibraryApi.search(query, 5) }?.docs?.firstOrNull()
 
-    private suspend fun BookMetadata.enrichByIsbn(): BookMetadata =
-        isbn?.let { fetchIsbnMetadata(it) } ?: this
+    private suspend fun fetchAsinMetadata(asin: String): BookMetadata? {
+        // 1. Open Library: id_amazon field
+        val fromOlAmazon = olSearchFirst("id_amazon:$asin")?.toMetadata()
+        if (fromOlAmazon != null && fromOlAmazon.title.isNotBlank()) {
+            return fromOlAmazon.enrichMetadata()
+        }
+
+        // 2. Open Library: general search with ASIN
+        val fromOlGeneral = olSearchFirst(asin)?.toMetadata()
+        if (fromOlGeneral != null && fromOlGeneral.title.isNotBlank()) {
+            return fromOlGeneral.enrichMetadata()
+        }
+
+        // 3. Google Books: general search with ASIN
+        val fromGb = callApi { googleBooksApi.search(asin, 5) }
+            ?.items.orEmpty()
+            .mapNotNull { it.volumeInfo?.let { v -> toMetadata(null, v) } }
+            .firstOrNull { it.title.isNotBlank() }
+        if (fromGb != null) {
+            return fromGb.enrichMetadata()
+        }
+
+        // 4. Audnex public API (covers Audible / Amazon ASINs)
+        val fromAudnex = fetchAudnex(asin)
+        if (fromAudnex != null && fromAudnex.title.isNotBlank()) {
+            return fromAudnex.enrichMetadata()
+        }
+
+        return null
+    }
+
+    private suspend fun fetchAudnex(asin: String): BookMetadata? {
+        for (region in listOf("de", "us")) {
+            val url = "https://api.audnex.us/books/$asin?region=$region"
+            val body = callApi {
+                okHttpClient.newCall(Request.Builder().url(url).build()).execute().use { resp ->
+                    if (resp.isSuccessful) resp.body?.string() else null
+                }
+            } ?: continue
+            val parsed = parseAudnexJson(body)
+            if (parsed != null && parsed.title.isNotBlank()) return parsed
+        }
+        return null
+    }
+
+    private fun parseAudnexJson(raw: String): BookMetadata? = try {
+        val obj = org.json.JSONObject(raw)
+        val title = obj.optString("title").trim()
+        if (title.isBlank()) return null
+        val subtitle = obj.optString("subtitle").trim()
+        val authorsArr = obj.optJSONArray("authors")
+        val authors = buildList {
+            if (authorsArr != null) {
+                for (i in 0 until authorsArr.length()) {
+                    val name = authorsArr.optJSONObject(i)?.optString("name")?.trim().orEmpty()
+                    if (name.isNotBlank()) add(name)
+                }
+            }
+        }.joinToString(", ")
+        val publisher = obj.optString("publisherName").trim()
+        val year = parseYear(obj.optString("releaseDate"))
+        val summary = obj.optString("summary")
+            .replace(Regex("<[^>]+>"), " ")
+            .replace(Regex("\\s+"), " ")
+            .trim()
+        val image = obj.optString("image").trim().ifBlank { null }
+        val language = obj.optString("language").trim()
+        val genresArr = obj.optJSONArray("genres")
+        val categories = buildList {
+            if (genresArr != null) {
+                for (i in 0 until genresArr.length()) {
+                    val name = genresArr.optJSONObject(i)?.optString("name")?.trim().orEmpty()
+                    if (name.isNotBlank()) add(name)
+                }
+            }
+        }.distinct().take(6)
+        val seriesPrimary = obj.optJSONObject("seriesPrimary")
+        val seriesHints = buildList {
+            if (seriesPrimary != null) {
+                val sName = seriesPrimary.optString("name").trim()
+                val sPos = seriesPrimary.optString("position").trim()
+                if (sName.isNotBlank()) {
+                    add(if (sPos.isNotBlank()) "$sName #$sPos" else sName)
+                }
+            }
+        }
+        val isbn = normalizeIsbn(obj.optString("isbn"))
+        BookMetadata(
+            isbn = isbn,
+            title = title,
+            subtitle = subtitle,
+            author = authors,
+            publisher = publisher,
+            publishedYear = year,
+            description = summary,
+            categories = categories,
+            coverUrl = image,
+            language = language,
+            seriesHints = seriesHints
+        )
+    } catch (_: Exception) {
+        null
+    }
+
+    private suspend fun BookMetadata.enrichMetadata(): BookMetadata {
+        var current = isbn?.let { fetchIsbnMetadata(it) } ?: this
+        if (current.title.isNotBlank() && (current.coverUrl.isNullOrBlank() || current.description.isBlank() || current.pageCount == null)) {
+            val ranked = searchAndRankByTitleAuthor(current.title, current.author, maxResults = 8).firstOrNull()
+            if (ranked != null) {
+                current = current.copy(
+                    isbn = current.isbn ?: ranked.isbn,
+                    subtitle = current.subtitle.ifBlank { ranked.subtitle },
+                    author = current.author.ifBlank { ranked.author },
+                    publisher = current.publisher.ifBlank { ranked.publisher },
+                    publishedYear = current.publishedYear ?: ranked.publishedYear,
+                    description = current.description.ifBlank { ranked.description },
+                    categories = current.categories.ifEmpty { ranked.categories },
+                    coverUrl = current.coverUrl ?: ranked.coverUrl,
+                    pageCount = current.pageCount ?: ranked.pageCount,
+                    language = current.language.ifBlank { ranked.language },
+                    seriesHints = (current.seriesHints + ranked.seriesHints).distinct()
+                )
+            }
+        }
+        return current
+    }
 
     private fun OlDoc.toMetadata(): BookMetadata = BookMetadata(
         isbn = isbn?.firstOrNull { it.length == 13 } ?: isbn?.firstOrNull(),
@@ -530,11 +661,14 @@ class BookMetadataFetcher(
     companion object {
         enum class IdentifierKind { ISBN, ASIN, GOODREADS }
 
+        private val amazonUrlRegex = Regex("(?:dp|gp/product|ASIN)/([A-Z0-9]{10})", RegexOption.IGNORE_CASE)
+
         fun classifyIdentifier(raw: String): List<Pair<IdentifierKind, String>> {
-            val cleaned = raw.trim().uppercase().filter { it.isLetterOrDigit() }
+            val extracted = amazonUrlRegex.find(raw)?.groupValues?.getOrNull(1) ?: raw
+            val cleaned = extracted.trim().uppercase().filter { it.isLetterOrDigit() }
             val result = mutableListOf<Pair<IdentifierKind, String>>()
-            normalizeIsbn(raw)?.let { result += IdentifierKind.ISBN to it }
-            if (cleaned.length == 10 && cleaned[0] == 'B') {
+            normalizeIsbn(extracted)?.let { result += IdentifierKind.ISBN to it }
+            if (cleaned.length == 10 && cleaned[0] in listOf('B', 'A') && cleaned.any { it.isLetter() }) {
                 result += IdentifierKind.ASIN to cleaned
             }
             if (cleaned.all { it.isDigit() } && cleaned.length in 5..12) {

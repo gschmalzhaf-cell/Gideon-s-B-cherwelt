@@ -1,5 +1,7 @@
 package com.gideon.buecherwelt.ui.screens.add
 
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -7,6 +9,7 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -14,9 +17,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.QrCodeScanner
@@ -25,20 +31,23 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Slider
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -233,8 +242,38 @@ fun AddBookScreen(
             if (state.error != null) {
                 ErrorBanner(message = state.error!!, onDismiss = viewModel::dismissError)
             }
+            if (state.statusInfo != null) {
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = state.statusInfo!!,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                            modifier = Modifier.weight(1f)
+                        )
+                        IconButton(
+                            onClick = viewModel::dismissStatusInfo,
+                            modifier = Modifier.size(22.dp)
+                        ) {
+                            Icon(Icons.Default.Close, contentDescription = "Schließen", modifier = Modifier.size(16.dp))
+                        }
+                    }
+                }
+            }
 
             if (editBookId == null) {
+                var searchMode by remember { mutableIntStateOf(0) } // 0 = ISBN/ASIN, 1 = Titel-Suche
+                var titleSearchQuery by remember { mutableStateOf("") }
+                var authorSearchQuery by remember { mutableStateOf("") }
+
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
@@ -245,32 +284,206 @@ fun AddBookScreen(
                         modifier = Modifier.padding(16.dp),
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        AppTextField(
-                            value = isbn,
-                            onValueChange = { isbn = it },
-                            label = { Text("ISBN / ASIN / Goodreads-ID") },
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                            listOf("ISBN / ASIN", "Titel-Suche").forEachIndexed { index, label ->
+                                SegmentedButton(
+                                    selected = searchMode == index,
+                                    onClick = { searchMode = index },
+                                    shape = SegmentedButtonDefaults.itemShape(index, 2)
+                                ) {
+                                    Text(label)
+                                }
+                            }
+                        }
+
+                        if (searchMode == 0) {
+                            AppTextField(
+                                value = isbn,
+                                onValueChange = { isbn = it },
+                                label = { Text("ISBN / ASIN / Amazon-Link / Goodreads-ID") },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Button(
+                                    onClick = { viewModel.onIsbnSubmitted(isbn) },
+                                    enabled = !state.loading && !state.aiCompletionLoading && isbn.isNotBlank()
+                                ) {
+                                    if (state.loading) {
+                                        CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                                    } else {
+                                        Icon(Icons.Default.Search, contentDescription = null)
+                                    }
+                                    Spacer(Modifier.width(8.dp))
+                                    Text("Daten laden")
+                                }
+                                OutlinedButton(onClick = { navController.navigate(Screen.Scanner.route) }) {
+                                    Icon(Icons.Default.QrCodeScanner, contentDescription = null)
+                                    Spacer(Modifier.width(8.dp))
+                                    Text("ISBN scannen")
+                                }
+                            }
+                            if (state.llmConfigured && isbn.isNotBlank()) {
+                                OutlinedButton(
+                                    onClick = { viewModel.completeWithAi(identifier = isbn) },
+                                    enabled = !state.loading && !state.aiCompletionLoading,
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    if (state.aiCompletionLoading) {
+                                        CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                                    } else {
+                                        Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(18.dp))
+                                    }
+                                    Spacer(Modifier.width(8.dp))
+                                    Text("Kennung / ASIN mit KI suchen & vervollständigen")
+                                }
+                            }
+                        } else {
+                            AppTextField(
+                                value = titleSearchQuery,
+                                onValueChange = { titleSearchQuery = it },
+                                label = { Text("Buchtitel suchen *") },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            AppTextField(
+                                value = authorSearchQuery,
+                                onValueChange = { authorSearchQuery = it },
+                                label = { Text("Autor:in (optional)") },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth()
+                            )
                             Button(
-                                onClick = { viewModel.onIsbnSubmitted(isbn) },
-                                enabled = !state.loading && isbn.isNotBlank()
+                                onClick = { viewModel.searchByTitle(titleSearchQuery, authorSearchQuery) },
+                                enabled = !state.loading && !state.aiCompletionLoading && titleSearchQuery.isNotBlank(),
+                                modifier = Modifier.fillMaxWidth()
                             ) {
                                 if (state.loading) {
-                                    CircularProgressIndicator(modifier = Modifier.size(18.dp))
+                                    CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
                                 } else {
                                     Icon(Icons.Default.Search, contentDescription = null)
                                 }
                                 Spacer(Modifier.width(8.dp))
-                                Text("Daten laden")
+                                Text("Nach Titel suchen")
                             }
-                            OutlinedButton(onClick = { navController.navigate(Screen.Scanner.route) }) {
-                                Icon(Icons.Default.QrCodeScanner, contentDescription = null)
-                                Spacer(Modifier.width(8.dp))
-                                Text("ISBN scannen")
+                            if (state.llmConfigured) {
+                                OutlinedButton(
+                                    onClick = {
+                                        viewModel.completeWithAi(
+                                            title = titleSearchQuery.ifBlank { title },
+                                            author = authorSearchQuery.ifBlank { author }
+                                        )
+                                    },
+                                    enabled = !state.loading && !state.aiCompletionLoading && (titleSearchQuery.isNotBlank() || title.isNotBlank()),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    if (state.aiCompletionLoading) {
+                                        CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                                    } else {
+                                        Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(18.dp))
+                                    }
+                                    Spacer(Modifier.width(8.dp))
+                                    Text("Mit KI suchen & Felder vervollständigen")
+                                }
                             }
                         }
+
+                        if (state.searchResults.isNotEmpty() || state.searchResultsEmpty) {
+                            HorizontalDivider()
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = if (state.searchResultsEmpty) {
+                                        "Keine Treffer im Katalog gefunden."
+                                    } else {
+                                        "Treffer auswählen (${state.searchResults.size})"
+                                    },
+                                    style = MaterialTheme.typography.labelLarge
+                                )
+                                TextButton(onClick = viewModel::clearSearchResults) {
+                                    Text("Schließen")
+                                }
+                            }
+                            state.searchResults.forEach { cand ->
+                                Surface(
+                                    shape = RoundedCornerShape(10.dp),
+                                    color = MaterialTheme.colorScheme.surfaceContainerLow,
+                                    border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable { viewModel.selectSearchResult(cand) }
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(10.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        BookCover(
+                                            coverPath = null,
+                                            coverUrl = cand.coverUrl,
+                                            contentDescription = cand.title,
+                                            title = cand.title,
+                                            author = cand.author,
+                                            cornerRadius = 6.dp,
+                                            modifier = Modifier
+                                                .width(44.dp)
+                                                .aspectRatio(2f / 3f)
+                                        )
+                                        Column(
+                                            modifier = Modifier
+                                                .padding(start = 10.dp)
+                                                .weight(1f)
+                                        ) {
+                                            Text(
+                                                text = cand.title,
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                maxLines = 2
+                                            )
+                                            if (cand.author.isNotBlank()) {
+                                                Text(
+                                                    text = cand.author,
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                    maxLines = 1
+                                                )
+                                            }
+                                            val metaLine = listOfNotNull(
+                                                cand.publisher.takeIf { it.isNotBlank() },
+                                                cand.publishedYear?.toString(),
+                                                cand.pageCount?.let { "$it S." }
+                                            ).joinToString(" · ")
+                                            if (metaLine.isNotBlank()) {
+                                                Text(
+                                                    text = metaLine,
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    color = MaterialTheme.colorScheme.primary,
+                                                    maxLines = 1
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            if (state.llmConfigured) {
+                                OutlinedButton(
+                                    onClick = {
+                                        viewModel.completeWithAi(
+                                            title = titleSearchQuery.ifBlank { title },
+                                            author = authorSearchQuery.ifBlank { author }
+                                        )
+                                    },
+                                    enabled = !state.aiCompletionLoading && (titleSearchQuery.isNotBlank() || title.isNotBlank()),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(18.dp))
+                                    Spacer(Modifier.width(8.dp))
+                                    Text("Nicht dabei? Mit KI vervollständigen")
+                                }
+                            }
+                        }
+
                         OutlinedButton(
                             onClick = { showCoverDialog = true },
                             modifier = Modifier.fillMaxWidth()
@@ -280,7 +493,7 @@ fun AddBookScreen(
                             Text("Cover scannen (Foto/Galerie)")
                         }
                         Text(
-                            text = "Ohne Kennung: Felder unten manuell ausfüllen und speichern.",
+                            text = "Ohne Kennung: Titel-Suche nutzen oder Felder unten manuell ausfüllen.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -332,6 +545,42 @@ fun AddBookScreen(
             AppTextField(value = title, onValueChange = { title = it }, label = { Text("Titel *") }, modifier = Modifier.fillMaxWidth())
             AppTextField(value = subtitle, onValueChange = { subtitle = it }, label = { Text("Untertitel") }, modifier = Modifier.fillMaxWidth())
             AppTextField(value = author, onValueChange = { author = it }, label = { Text("Autor:in") }, modifier = Modifier.fillMaxWidth())
+            if (state.llmConfigured && (title.isNotBlank() || isbn.isNotBlank())) {
+                OutlinedButton(
+                    onClick = {
+                        viewModel.completeWithAi(
+                            identifier = formInit?.isbn ?: isbn,
+                            title = title,
+                            subtitle = subtitle,
+                            author = author,
+                            publisher = publisher,
+                            publishedYear = yearText.trim().toIntOrNull(),
+                            pageCount = pageCountText.trim().toIntOrNull(),
+                            language = language,
+                            description = description,
+                            genre = genre,
+                            subgenre = subgenre,
+                            seriesName = seriesName,
+                            seriesIndex = seriesIndexText.trim().toIntOrNull(),
+                            universeName = universeName,
+                            spice = spice,
+                            selectedTropes = selectedTropes,
+                            coverUrl = coverUrl,
+                            coverPath = coverPath
+                        )
+                    },
+                    enabled = !state.aiCompletionLoading && !state.loading,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    if (state.aiCompletionLoading) {
+                        CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                    } else {
+                        Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(18.dp))
+                    }
+                    Spacer(Modifier.width(8.dp))
+                    Text("Fehlende Buchdetails & Cover mit KI vervollständigen")
+                }
+            }
             AppTextField(value = publisher, onValueChange = { publisher = it }, label = { Text("Verlag") }, modifier = Modifier.fillMaxWidth())
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                 AppTextField(

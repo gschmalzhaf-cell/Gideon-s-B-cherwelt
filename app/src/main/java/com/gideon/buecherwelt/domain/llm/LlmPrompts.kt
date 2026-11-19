@@ -44,6 +44,71 @@ object LlmPrompts {
         return system to user
     }
 
+    fun completeBook(
+        catalog: List<Trope>,
+        identifier: String = "",
+        title: String = "",
+        subtitle: String = "",
+        author: String = "",
+        publisher: String = "",
+        publishedYear: Int? = null,
+        pageCount: Int? = null,
+        description: String = "",
+        genre: String = "",
+        seriesName: String = "",
+        universeName: String = ""
+    ): Pair<String, String> {
+        val system = """
+            Du bist ein präziser Buch-Assistent für eine persönliche Bibliothek.
+            Deine Aufgabe: Identifiziere das gesuchte Buch anhand von Kennung (ISBN/ASIN/Goodreads-ID), Titel oder Autor:in und vervollständige fehlende Buchdaten.
+            Antworte AUSSCHLIESSLICH mit einem JSON-Objekt ohne erklärenden Text:
+            {
+              "found": true,
+              "title": "",
+              "subtitle": "",
+              "author": "",
+              "isbn": "",
+              "publisher": "",
+              "publishedYear": null,
+              "pageCount": null,
+              "language": "de",
+              "description": "",
+              "genre": "",
+              "subgenre": "",
+              "seriesName": "",
+              "seriesIndex": null,
+              "universeName": "",
+              "spice": 0,
+              "tropes": []
+            }
+            Regeln:
+            - Wenn du die Kennung (z. B. eine unbekannte ASIN) oder das Buch NICHT sicher kennst, setze "found": false und erfinde KEINE Fakten!
+            - "description": spoilerfreier, aussagekräftiger deutscher Klappentext (3-5 Sätze), falls noch keiner vorhanden ist.
+            - "seriesName" / "seriesIndex": Name der Buchreihe und Bandnummer (ganze Zahl), falls Teil einer Reihe.
+            - "universeName": Name des übergeordneten Buch-Universums (z. B. "Maasverse", "Grishaverse", "Empyrean-Universum", "Schattenjäger-Universum"), sonst leer.
+            - "spice": ganze Zahl 0-5.
+            - "tropes": maximal 8 passende Namen exakt wie im Katalog.
+        """.trimIndent()
+        val catalogText = catalog.joinToString(", ") { it.name }
+        val user = buildString {
+            appendLine("Vorhandene Angaben:")
+            if (identifier.isNotBlank()) appendLine("- Kennung (ISBN/ASIN/ID): $identifier")
+            if (title.isNotBlank()) appendLine("- Titel: $title")
+            if (subtitle.isNotBlank()) appendLine("- Untertitel: $subtitle")
+            if (author.isNotBlank()) appendLine("- Autor:in: $author")
+            if (publisher.isNotBlank()) appendLine("- Verlag: $publisher")
+            if (publishedYear != null) appendLine("- Erscheinungsjahr: $publishedYear")
+            if (pageCount != null) appendLine("- Seitenzahl: $pageCount")
+            if (genre.isNotBlank()) appendLine("- Genre: $genre")
+            if (seriesName.isNotBlank()) appendLine("- Buchreihe: $seriesName")
+            if (universeName.isNotBlank()) appendLine("- Buch-Universum: $universeName")
+            if (description.isNotBlank()) appendLine("- Vorhandener Klappentext: ${description.take(1500)}")
+            appendLine()
+            appendLine("Verfügbare Tropes: $catalogText")
+        }
+        return system to user
+    }
+
     fun bookRecommendations(profile: ReadingProfile): Pair<String, String> {
         val system = """
             Du empfiehlst Bücher anhand eines Leseprofils.

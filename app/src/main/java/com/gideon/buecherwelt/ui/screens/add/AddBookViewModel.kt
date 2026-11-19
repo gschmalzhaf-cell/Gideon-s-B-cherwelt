@@ -12,6 +12,7 @@ import com.gideon.buecherwelt.domain.llm.CoverIdentifier
 import com.gideon.buecherwelt.domain.llm.LlmService
 import com.gideon.buecherwelt.domain.llm.TropeSuggestion
 import com.gideon.buecherwelt.data.network.BookMetadata
+import com.gideon.buecherwelt.data.network.SearchListResult
 import com.gideon.buecherwelt.domain.model.Book
 import com.gideon.buecherwelt.domain.model.Trope
 import com.gideon.buecherwelt.domain.repository.BookRepository
@@ -76,7 +77,11 @@ sealed interface SaveResult {
 data class AddBookUiState(
     val loading: Boolean = false,
     val error: String? = null,
+    val statusInfo: String? = null,
     val formInit: FormInit? = null,
+    val searchResults: List<BookMetadata> = emptyList(),
+    val searchResultsEmpty: Boolean = false,
+    val aiCompletionLoading: Boolean = false,
     val allTropes: List<Trope> = emptyList(),
     val suggestions: TropeSuggestion? = null,
     val suggestionLoading: Boolean = false,
@@ -162,18 +167,41 @@ class AddBookViewModel(
     }
 
     fun dismissError() = _state.update { it.copy(error = null) }
+    fun dismissStatusInfo() = _state.update { it.copy(statusInfo = null) }
+    fun clearSearchResults() = _state.update { it.copy(searchResults = emptyList(), searchResultsEmpty = false) }
 
     fun onIsbnSubmitted(rawIsbn: String) {
         if (rawIsbn.isBlank()) return
         viewModelScope.launch {
-            _state.update { it.copy(loading = true, error = null, suggestions = null) }
+            _state.update {
+                it.copy(
+                    loading = true,
+                    error = null,
+                    statusInfo = null,
+                    suggestions = null,
+                    searchResults = emptyList(),
+                    searchResultsEmpty = false
+                )
+            }
+            val kinds = BookMetadataFetcher.classifyIdentifier(rawIsbn)
+            val isAsin = kinds.any { it.first == BookMetadataFetcher.Companion.IdentifierKind.ASIN }
             when (val result = metadataFetcher.fetchByIsbn(rawIsbn)) {
                 is FetchResult.Success -> applyMetadata(result.metadata, rawIsbn)
-                is FetchResult.NotFound -> _state.update {
-                    it.copy(
-                        loading = false,
-                        error = "Zu dieser Kennung wurden keine Daten gefunden (Google Books, Open Library und DNB geprüft). Du kannst das Buch unten manuell anlegen."
-                    )
+                is FetchResult.NotFound -> {
+                    if (isAsin && llmConfig.isConfigured) {
+                        val aiResolved = runAiCompletionInternal(identifier = rawIsbn.trim())
+                        if (aiResolved) return@launch
+                    }
+                    _state.update {
+                        it.copy(
+                            loading = false,
+                            error = if (isAsin) {
+                                "Zu dieser ASIN wurden keine Katalogdaten gefunden (Open Library, Google Books & Audnex geprüft). Tipp: Nutze die Titel-Suche oder fülle Titel + Autor:in mit KI aus."
+                            } else {
+                                "Zu dieser Kennung wurden keine Daten gefunden (Google Books, Open Library und DNB geprüft). Tipp: Nutze die Titel-Suche oder lege das Buch unten manuell an."
+                            }
+                        )
+                    }
                 }
                 is FetchResult.NoNetwork -> _state.update {
                     it.copy(
@@ -186,6 +214,238 @@ class AddBookViewModel(
                 }
             }
         }
+    }
+
+    fun searchByTitle(titleQuery: String, authorQuery: String = "") {
+        if (titleQuery.isBlank()) return
+        viewModelScope.launch {
+            _state.update {
+                it.copy(
+                    loading = true,
+                    error = null,
+                    statusInfo = null,
+                    searchResults = emptyList(),
+                    searchResultsEmpty = false
+                )
+            }
+            when (val res = metadataFetcher.searchByTitle(titleQuery, authorQuery)) {
+                is SearchListResult.Success -> _state.update {
+                    it.copy(loading = false, searchResults = res.items, searchResultsEmpty = false)
+                }
+                is SearchListResult.Empty -> _state.update {
+                    it.copy(loading = false, searchResults = emptyList(), searchResultsEmpty = true)
+                }
+                is SearchListResult.NoNetwork -> _state.update {
+                    it.copy(loading = false, error = "Keine Netzwerkverbindung für die Titelsuche.")
+                }
+                is SearchListResult.Error -> _state.update {
+                    it.copy(loading = false, error = res.message)
+                }
+            }
+        }
+    }
+
+    fun selectSearchResult(meta: BookMetadata) {
+        viewModelScope.launch {
+            _state.update {
+                it.copy(
+                    loading = true,
+                    error = null,
+                    searchResults = emptyList(),
+                    searchResultsEmpty = false
+                )
+            }
+            val enriched = if (meta.isbn != null && (meta.description.isBlank() || meta.coverUrl.isNullOrBlank())) {
+                when (val r = metadataFetcher.fetchByIsbn(meta.isbn)) {
+                    is FetchResult.Success -> r.metadata.copy(
+                        coverUrl = r.metadata.coverUrl ?: meta.coverUrl,
+                        description = r.metadata.description.ifBlank { meta.description }
+                    )
+                    else -> meta
+                }
+            } else meta
+            applyMetadata(enriched, enriched.isbn)
+        }
+    }
+
+    fun completeWithAi(
+        identifier: String = "",
+        title: String = "",
+        subtitle: String = "",
+        author: String = "",
+        publisher: String = "",
+        publishedYear: Int? = null,
+        pageCount: Int? = null,
+        language: String = "",
+        description: String = "",
+        genre: String = "",
+        subgenre: String = "",
+        seriesName: String = "",
+        seriesIndex: Int? = null,
+        universeName: String = "",
+        spice: Int = 0,
+        selectedTropes: Set<String> = emptySet(),
+        coverUrl: String? = null,
+        coverPath: String? = null
+    ) {
+        if (!llmConfig.isConfigured) {
+            _state.update { it.copy(error = "Für die KI-Vervollständigung bitte zuerst einen LLM-API-Key in den Einstellungen hinterlegen.") }
+            return
+        }
+        if (identifier.isBlank() && title.isBlank()) {
+            _state.update { it.copy(error = "Bitte mindestens einen Buchtitel oder eine Kennung (ISBN/ASIN) eingeben.") }
+            return
+        }
+        viewModelScope.launch {
+            runAiCompletionInternal(
+                identifier = identifier,
+                title = title,
+                subtitle = subtitle,
+                author = author,
+                publisher = publisher,
+                publishedYear = publishedYear,
+                pageCount = pageCount,
+                language = language,
+                description = description,
+                genre = genre,
+                subgenre = subgenre,
+                seriesName = seriesName,
+                seriesIndex = seriesIndex,
+                universeName = universeName,
+                spice = spice,
+                selectedTropes = selectedTropes,
+                coverUrl = coverUrl,
+                coverPath = coverPath
+            )
+        }
+    }
+
+    private suspend fun runAiCompletionInternal(
+        identifier: String = "",
+        title: String = "",
+        subtitle: String = "",
+        author: String = "",
+        publisher: String = "",
+        publishedYear: Int? = null,
+        pageCount: Int? = null,
+        language: String = "",
+        description: String = "",
+        genre: String = "",
+        subgenre: String = "",
+        seriesName: String = "",
+        seriesIndex: Int? = null,
+        universeName: String = "",
+        spice: Int = 0,
+        selectedTropes: Set<String> = emptySet(),
+        coverUrl: String? = null,
+        coverPath: String? = null
+    ): Boolean {
+        _state.update { it.copy(aiCompletionLoading = true, error = null, statusInfo = null) }
+        val completion = llmService.completeBook(
+            config = llmConfig,
+            identifier = identifier.trim(),
+            title = title.trim(),
+            subtitle = subtitle.trim(),
+            author = author.trim(),
+            publisher = publisher.trim(),
+            publishedYear = publishedYear,
+            pageCount = pageCount,
+            description = description.trim(),
+            genre = genre.trim(),
+            seriesName = seriesName.trim(),
+            universeName = universeName.trim()
+        )
+        if (completion == null || !completion.found || (completion.title.isBlank() && title.isBlank())) {
+            _state.update {
+                it.copy(
+                    loading = false,
+                    aiCompletionLoading = false,
+                    error = "Die KI konnte das Buch anhand dieser Angaben nicht sicher identifizieren."
+                )
+            }
+            return false
+        }
+
+        val resolvedTitle = title.ifBlank { completion.title }
+        val resolvedAuthor = author.ifBlank { completion.author }
+        val resolvedIsbn = BookMetadataFetcher.normalizeIsbn(identifier)
+            ?: BookMetadataFetcher.normalizeIsbn(completion.isbn)
+            ?: _state.value.formInit?.isbn
+
+        // Online-Nachladen für Cover & exakte Verlagsdaten falls noch fehlend
+        var onlineMeta: BookMetadata? = null
+        if (coverPath == null || coverUrl == null || resolvedIsbn != null) {
+            val lookup = if (resolvedIsbn != null) {
+                metadataFetcher.fetchByIsbn(resolvedIsbn)
+            } else {
+                metadataFetcher.findByTitleAuthor(resolvedTitle, resolvedAuthor)
+            }
+            if (lookup is FetchResult.Success) {
+                onlineMeta = lookup.metadata
+            }
+        }
+
+        val finalCoverUrl = coverUrl ?: onlineMeta?.coverUrl
+        val finalCoverPath = coverPath ?: coverCache.downloadWithFallback(
+            primaryUrl = finalCoverUrl,
+            isbn = resolvedIsbn ?: onlineMeta?.isbn,
+            key = CoverCache.keyFor(resolvedIsbn ?: onlineMeta?.isbn, resolvedTitle, resolvedAuthor),
+            forceRefresh = false
+        )
+
+        val finalTitle = resolvedTitle
+        val finalSubtitle = subtitle.ifBlank { onlineMeta?.subtitle.orEmpty() }.ifBlank { completion.subtitle }
+        val finalAuthor = resolvedAuthor.ifBlank { onlineMeta?.author.orEmpty() }
+        val finalDesc = description.ifBlank { completion.description }.ifBlank { onlineMeta?.description.orEmpty() }
+
+        val detectedSU = com.gideon.buecherwelt.domain.analysis.SeriesUniverseDetector.detect(
+            title = finalTitle,
+            subtitle = finalSubtitle,
+            author = finalAuthor,
+            description = finalDesc,
+            apiSeries = onlineMeta?.seriesHints.orEmpty(),
+            existingSeries = _state.value.seriesNames,
+            existingUniverses = _state.value.universeNames
+        )
+
+        val finalSeries = seriesName.ifBlank { completion.seriesName }.ifBlank { detectedSU.seriesName }
+        val finalSeriesIdx = seriesIndex ?: completion.seriesIndex ?: detectedSU.seriesIndex
+        val finalUniverse = universeName.ifBlank { completion.universeName }.ifBlank { detectedSU.universeName }
+        val finalTropes = (selectedTropes + completion.tropes).filter { it.isNotBlank() }.toSet()
+
+        _state.update {
+            it.copy(
+                loading = false,
+                aiCompletionLoading = false,
+                searchResults = emptyList(),
+                searchResultsEmpty = false,
+                statusInfo = "Buchdaten & Cover durch KI und Katalogsuche vervollständigt.",
+                formInit = FormInit(
+                    isbn = resolvedIsbn ?: onlineMeta?.isbn ?: identifier.trim().takeIf { id -> id.isNotBlank() },
+                    title = finalTitle,
+                    subtitle = finalSubtitle,
+                    author = finalAuthor,
+                    publisher = publisher.ifBlank { onlineMeta?.publisher.orEmpty() }.ifBlank { completion.publisher },
+                    publishedYear = publishedYear ?: onlineMeta?.publishedYear ?: completion.publishedYear,
+                    pageCount = pageCount ?: onlineMeta?.pageCount ?: completion.pageCount,
+                    language = language.ifBlank { onlineMeta?.language.orEmpty() }.ifBlank { completion.language },
+                    description = finalDesc,
+                    genre = genre.ifBlank { completion.genre }.ifBlank { onlineMeta?.categories?.firstOrNull().orEmpty() },
+                    subgenre = subgenre.ifBlank { completion.subgenre }.ifBlank { onlineMeta?.categories?.getOrNull(1).orEmpty() },
+                    spice = if (spice > 0) spice else (completion.spice ?: 0),
+                    rating = _state.value.formInit?.rating,
+                    status = _state.value.formInit?.status ?: ReadingStatus.PLANNED,
+                    notes = _state.value.formInit?.notes.orEmpty(),
+                    seriesName = finalSeries,
+                    seriesIndex = finalSeriesIdx,
+                    universeName = finalUniverse,
+                    tropes = finalTropes,
+                    coverUrl = finalCoverUrl,
+                    coverPath = finalCoverPath
+                )
+            )
+        }
+        return true
     }
 
     fun onCoverImageFailed() {

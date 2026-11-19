@@ -27,6 +27,40 @@ class LlmService(
         return LlmResponseParser.parseTropeSuggestion(content)
     }
 
+    suspend fun completeBook(
+        config: LlmConfig,
+        identifier: String = "",
+        title: String = "",
+        subtitle: String = "",
+        author: String = "",
+        publisher: String = "",
+        publishedYear: Int? = null,
+        pageCount: Int? = null,
+        description: String = "",
+        genre: String = "",
+        seriesName: String = "",
+        universeName: String = ""
+    ): AiBookCompletion? {
+        if (!config.isConfigured) return null
+        val catalog = tropeRepository.getAll()
+        val (system, user) = LlmPrompts.completeBook(
+            catalog = catalog,
+            identifier = identifier,
+            title = title,
+            subtitle = subtitle,
+            author = author,
+            publisher = publisher,
+            publishedYear = publishedYear,
+            pageCount = pageCount,
+            description = description,
+            genre = genre,
+            seriesName = seriesName,
+            universeName = universeName
+        )
+        val content = client.complete(config, system, user) ?: return null
+        return LlmResponseParser.parseBookCompletion(content)
+    }
+
     suspend fun recommendBooks(config: LlmConfig, profile: ReadingProfile): List<LlmBookRecommendation> {
         if (!config.isConfigured) return emptyList()
         val (system, user) = LlmPrompts.bookRecommendations(profile)
