@@ -494,6 +494,49 @@ class BookMetadataFetcher(
     }
 
     /**
+     * Sucht mehrere passende Bücher nach Titel (und optional Autor:in) über Google Books, Open Library und DNB
+     * für die Auswahl beim Buch-Erfassen.
+     */
+    suspend fun searchByTitle(
+        title: String,
+        author: String = "",
+        maxResults: Int = 15
+    ): SearchListResult {
+        val cleanTitle = title.trim()
+        if (cleanTitle.isBlank()) return SearchListResult.Empty
+        return try {
+            val ranked = searchAndRankByTitleAuthor(cleanTitle, author.trim(), maxResults = maxResults).toMutableList()
+            if (ranked.size < 3) {
+                val baseTitle = stripSeriesFromTitle(cleanTitle)
+                val cql = buildString {
+                    append("tit=\"${baseTitle.replace("\"", "")}\"")
+                    if (author.isNotBlank()) append(" and per=\"${author.trim().replace("\"", "")}\"")
+                }
+                val dnb = fetchDnbQuery(cql)
+                if (dnb != null && dnb.title.isNotBlank()) {
+                    val enrichedDnb = dnb.isbn?.let { fetchIsbnMetadata(it) } ?: dnb
+                    ranked += enrichedDnb
+                }
+            }
+            val deduped = ranked
+                .filter { it.title.isNotBlank() }
+                .distinctBy { b ->
+                    val t = b.title.lowercase().replace(Regex("[^a-z0-9äöüß]"), "").take(40)
+                    val a = b.author.lowercase().substringBefore(",").replace(Regex("[^a-z0-9äöüß]"), "").take(20)
+                    val id = b.isbn ?: b.coverUrl ?: ""
+                    "$t|$a|${id.take(15)}"
+                }
+                .take(12)
+
+            if (deduped.isEmpty()) SearchListResult.Empty else SearchListResult.Success(deduped)
+        } catch (_: NoNetworkException) {
+            SearchListResult.NoNetwork
+        } catch (e: Exception) {
+            SearchListResult.Error(e.message ?: "Fehler bei der Titelsuche.")
+        }
+    }
+
+    /**
      * Liefert mehrere passende Cover-Kandidaten (verschiedene Ausgaben von Google Books & Open Library)
      * für die manuelle oder automatische Cover-Auswahl auf der Buchdetailseite.
      */
