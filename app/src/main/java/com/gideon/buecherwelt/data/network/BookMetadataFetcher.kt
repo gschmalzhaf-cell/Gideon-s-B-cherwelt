@@ -1,6 +1,8 @@
 package com.gideon.buecherwelt.data.network
 
 import android.util.Xml
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.xmlpull.v1.XmlPullParser
@@ -21,9 +23,14 @@ class BookMetadataFetcher(
     private val okHttpClient: OkHttpClient
 ) {
 
-    suspend fun fetchByIdentifier(raw: String): FetchResult {
-        val candidates = classifyIdentifier(raw)
-        if (candidates.isEmpty()) {
+    suspend fun fetchByIdentifier(raw: String): FetchResult = withContext(Dispatchers.IO) {
+        val trimmed = raw.trim()
+        val resolvedUrl = if (isShortAmazonUrl(trimmed)) resolveRedirectUrl(trimmed) else null
+        val effectiveInput = resolvedUrl ?: trimmed
+        val candidates = classifyIdentifier(effectiveInput)
+        val slugTitleHint = extractAmazonSlugTitle(effectiveInput)
+
+        if (candidates.isEmpty() && slugTitleHint.isNullOrBlank()) {
             return FetchResult.Error(
                 "Ungültige Eingabe – erwartet ISBN (10/13 Zeichen), ASIN (z. B. B0…), Amazon-Link oder Goodreads-ID (Zahl)."
             )
@@ -37,12 +44,61 @@ class BookMetadataFetcher(
                 }
                 if (metadata != null && metadata.title.isNotBlank()) return FetchResult.Success(metadata)
             }
+            if (!slugTitleHint.isNullOrBlank()) {
+                val bySlug = searchAndRankByTitleAuthor(slugTitleHint, "", maxResults = 8).firstOrNull()
+                if (bySlug != null && bySlug.title.isNotBlank()) {
+                    return FetchResult.Success(bySlug)
+                }
+            }
             FetchResult.NotFound
         } catch (e: NoNetworkException) {
             FetchResult.NoNetwork
         } catch (e: Exception) {
             FetchResult.Error(e.message ?: "Unbekannter Fehler bei der Abfrage.")
         }
+    }
+
+    private fun isShortAmazonUrl(raw: String): Boolean {
+        val lower = raw.lowercase()
+        return (lower.startsWith("http://") || lower.startsWith("https://")) &&
+            (lower.contains("amzn.eu/") || lower.contains("amzn.to/") || lower.contains("a.co/"))
+    }
+
+    private fun resolveRedirectUrl(shortUrl: String): String? = try {
+        val noRedirectClient = okHttpClient.newBuilder()
+            .followRedirects(false)
+            .followSslRedirects(false)
+            .build()
+        var current = shortUrl
+        repeat(4) {
+            val req = Request.Builder()
+                .url(current)
+                .header("Accept", "text/html,application/xhtml+xml")
+                .build()
+            noRedirectClient.newCall(req).execute().use { resp ->
+                val loc = resp.header("Location")
+                if (resp.isRedirect && !loc.isNullOrBlank()) {
+                    current = if (loc.startsWith("http")) loc else java.net.URL(java.net.URL(current), loc).toString()
+                    if (amazonUrlRegex.containsMatchIn(current)) return current
+                } else {
+                    return current
+                }
+            }
+        }
+        current
+    } catch (_: Exception) {
+        null
+    }
+
+    private fun extractAmazonSlugTitle(urlOrText: String): String? {
+        if (!urlOrText.contains("amazon.", ignoreCase = true)) return null
+        val match = Regex("amazon\\.[^/]+/([^/?#]+)/dp/[A-Z0-9]{10}", RegexOption.IGNORE_CASE)
+            .find(urlOrText) ?: return null
+        val slug = match.groupValues[1]
+            .replace(Regex("-(ebook|kindle|taschenbuch|gebundene|ausgabe|german|edition)$", RegexOption.IGNORE_CASE), "")
+            .replace("-", " ")
+            .trim()
+        return slug.takeIf { it.length >= 3 && !it.equals("dp", ignoreCase = true) }
     }
 
     suspend fun fetchByIsbn(rawIsbn: String): FetchResult = fetchByIdentifier(rawIsbn)
@@ -239,7 +295,186 @@ class BookMetadataFetcher(
             return fromAudnex.enrichMetadata()
         }
 
+        // 5. Goodreads public autocomplete search with ASIN
+        val fromGr = fetchGoodreadsBooks(asin).firstOrNull()
+        if (fromGr != null && fromGr.title.isNotBlank()) {
+            return fromGr.enrichMetadata()
+        }
+
+        // 6. Safe Amazon product page metadata (only if HTTP 200 and no CAPTCHA/bot gate)
+        val fromAmazon = fetchAmazonPublicMeta(asin)
+        if (fromAmazon != null && fromAmazon.title.isNotBlank()) {
+            return fromAmazon.enrichMetadata()
+        }
+
         return null
+    }
+
+    private suspend fun fetchAmazonPublicMeta(asin: String): BookMetadata? {
+        for (domain in listOf("www.amazon.de", "www.amazon.com")) {
+            val url = "https://$domain/dp/$asin"
+            val html = callApi {
+                val req = Request.Builder()
+                    .url(url)
+                    .header("Accept", "text/html,application/xhtml+xml")
+                    .header("Accept-Language", "de-DE,de;q=0.9,en;q=0.8")
+                    .build()
+                okHttpClient.newCall(req).execute().use { resp ->
+                    if (resp.isSuccessful) resp.body?.string() else null
+                }
+            } ?: continue
+
+            // Never bypass or parse CAPTCHA / bot-check pages
+            if (html.contains("captcha", ignoreCase = true) ||
+                html.contains("Robot Check", ignoreCase = true) ||
+                html.contains("validateCaptcha", ignoreCase = true)
+            ) {
+                continue
+            }
+
+            val rawTitle = Regex("""<span[^>]*id="productTitle"[^>]*>\s*([^<]+?)\s*</span>""", RegexOption.IGNORE_CASE)
+                .find(html)?.groupValues?.getOrNull(1)?.trim()
+                ?: Regex("""<meta[^>]*name="title"[^>]*content="([^"]+)"""", RegexOption.IGNORE_CASE)
+                    .find(html)?.groupValues?.getOrNull(1)?.trim()
+                ?: Regex("""<title>\s*([^<]+?)\s*</title>""", RegexOption.IGNORE_CASE)
+                    .find(html)?.groupValues?.getOrNull(1)?.trim()
+
+            if (rawTitle.isNullOrBlank()) continue
+            val cleanTitle = decodeHtmlEntities(rawTitle)
+                .replace(Regex("""\s*:\s*Amazon\.[a-z.]+.*$""", RegexOption.IGNORE_CASE), "")
+                .replace(Regex("""\s*\([^)]*Kindle[^)]*\)\s*$""", RegexOption.IGNORE_CASE), "")
+                .replace(Regex("""\s*eBook\s*:\s*.*$""", RegexOption.IGNORE_CASE), "")
+                .trim()
+            if (cleanTitle.isBlank() || cleanTitle.equals("Amazon.de", ignoreCase = true)) continue
+
+            val author = Regex("""<span[^>]*class="[^"]*author[^"]*"[^>]*>[\s\S]*?<a[^>]*>([^<]+)</a>""", RegexOption.IGNORE_CASE)
+                .find(html)?.groupValues?.getOrNull(1)?.trim()?.let(::decodeHtmlEntities).orEmpty()
+
+            val coverUrl = Regex("""data-old-hires="(https://[^"]+)"""", RegexOption.IGNORE_CASE)
+                .find(html)?.groupValues?.getOrNull(1)
+                ?: Regex("""<meta[^>]*property="og:image"[^>]*content="(https://[^"]+)"""", RegexOption.IGNORE_CASE)
+                    .find(html)?.groupValues?.getOrNull(1)
+
+            val description = Regex("""<div[^>]*id="bookDescription_feature_div"[^>]*>[\s\S]*?<span[^>]*>([\s\S]*?)</span>""", RegexOption.IGNORE_CASE)
+                .find(html)?.groupValues?.getOrNull(1)
+                ?.replace(Regex("<[^>]+>"), " ")
+                ?.replace(Regex("\\s+"), " ")
+                ?.trim()
+                ?.let(::decodeHtmlEntities)
+                .orEmpty()
+
+            return BookMetadata(
+                title = cleanTitle,
+                author = author,
+                description = description,
+                coverUrl = coverUrl
+            )
+        }
+        return null
+    }
+
+    private fun decodeHtmlEntities(raw: String): String = raw
+        .replace("&amp;", "&")
+        .replace("&quot;", "\"")
+        .replace("&#39;", "'")
+        .replace("&apos;", "'")
+        .replace("&lt;", "<")
+        .replace("&gt;", ">")
+        .replace("&nbsp;", " ")
+        .trim()
+
+    private suspend fun fetchGoodreadsBooks(query: String): List<BookMetadata> {
+        val encoded = java.net.URLEncoder.encode(query, "UTF-8")
+        val url = "https://www.goodreads.com/book/auto_complete?format=json&q=$encoded"
+        val body = callApi {
+            okHttpClient.newCall(Request.Builder().url(url).build()).execute().use { resp ->
+                if (resp.isSuccessful) resp.body?.string() else null
+            }
+        } ?: return emptyList()
+        return try {
+            val arr = org.json.JSONArray(body)
+            buildList {
+                for (i in 0 until arr.length()) {
+                    val obj = arr.optJSONObject(i) ?: continue
+                    val title = obj.optString("bookTitleBare").trim()
+                        .ifBlank { obj.optString("title").trim() }
+                    if (title.isBlank()) continue
+                    val author = obj.optJSONObject("author")?.optString("name")?.trim().orEmpty()
+                    val rawImg = obj.optString("imageUrl").trim()
+                    val cover = rawImg
+                        .takeIf { it.isNotBlank() && !it.contains("nophoto") }
+                        ?.replace(Regex("\\._S[XY]\\d+_\\."), "._SX600_.")
+                    val pages = obj.optInt("numPages", 0).takeIf { it > 0 }
+                    add(
+                        BookMetadata(
+                            title = title,
+                            author = author,
+                            coverUrl = cover,
+                            pageCount = pages
+                        )
+                    )
+                }
+            }
+        } catch (_: Exception) {
+            emptyList()
+        }
+    }
+
+    private suspend fun fetchItunesBooks(query: String, limit: Int = 10): List<BookMetadata> {
+        val encoded = java.net.URLEncoder.encode(query, "UTF-8")
+        val result = mutableListOf<BookMetadata>()
+        for (country in listOf("de", "us")) {
+            val url = "https://itunes.apple.com/search?term=$encoded&media=ebook&country=$country&limit=$limit"
+            val body = callApi {
+                okHttpClient.newCall(Request.Builder().url(url).build()).execute().use { resp ->
+                    if (resp.isSuccessful) resp.body?.string() else null
+                }
+            } ?: continue
+            try {
+                val obj = org.json.JSONObject(body)
+                val arr = obj.optJSONArray("results") ?: continue
+                for (i in 0 until arr.length()) {
+                    val item = arr.optJSONObject(i) ?: continue
+                    val title = item.optString("trackName").trim()
+                    if (title.isBlank()) continue
+                    val author = item.optString("artistName").trim()
+                    val desc = item.optString("description")
+                        .replace(Regex("<[^>]+>"), " ")
+                        .replace(Regex("\\s+"), " ")
+                        .trim()
+                    val art = item.optString("artworkUrl100").trim()
+                        .ifBlank { item.optString("artworkUrl60").trim() }
+                        .replace("100x100bb", "600x600bb")
+                        .replace("60x60bb", "600x600bb")
+                        .ifBlank { null }
+                    val year = parseYear(item.optString("releaseDate"))
+                    val genresArr = item.optJSONArray("genres")
+                    val cats = buildList {
+                        if (genresArr != null) {
+                            for (g in 0 until genresArr.length()) {
+                                val name = genresArr.optString(g).trim()
+                                if (name.isNotBlank() && !name.equals("Books", ignoreCase = true) && !name.equals("Bücher", ignoreCase = true)) {
+                                    add(name)
+                                }
+                            }
+                        }
+                    }.distinct().take(6)
+                    result += BookMetadata(
+                        title = title,
+                        author = author,
+                        publishedYear = year,
+                        description = desc,
+                        categories = cats,
+                        coverUrl = art,
+                        language = if (country == "de") "de" else "en"
+                    )
+                }
+            } catch (_: Exception) {
+                // ignore malformed item
+            }
+            if (result.isNotEmpty()) break
+        }
+        return result
     }
 
     private suspend fun fetchAudnex(asin: String): BookMetadata? {
@@ -420,6 +655,13 @@ class BookMetadataFetcher(
             )
         }?.docs.orEmpty().map { it.toMetadata() }
         allCandidates += olDocs
+
+        // 4. Apple Books (iTunes) & Goodreads (crucial for German indie / KDP / self-published eBooks)
+        if (allCandidates.size < 5 || allCandidates.none { it.title.equals(baseTitle, ignoreCase = true) && !it.coverUrl.isNullOrBlank() }) {
+            val combinedQuery = listOf(baseTitle, primaryAuthor).filter { it.isNotBlank() }.joinToString(" ")
+            allCandidates += fetchItunesBooks(combinedQuery, limit = 8)
+            allCandidates += fetchGoodreadsBooks(combinedQuery)
+        }
 
         if (allCandidates.isEmpty()) return emptyList()
 
@@ -644,14 +886,16 @@ class BookMetadataFetcher(
         return score
     }
 
-    private suspend fun <T> callApi(block: suspend () -> T): T? = try {
-        block()
-    } catch (e: IOException) {
-        throw NoNetworkException()
-    } catch (e: HttpException) {
-        null
-    } catch (e: Exception) {
-        null
+    private suspend fun <T> callApi(block: suspend () -> T): T? = withContext(Dispatchers.IO) {
+        try {
+            block()
+        } catch (e: IOException) {
+            throw NoNetworkException()
+        } catch (e: HttpException) {
+            null
+        } catch (e: Exception) {
+            null
+        }
     }
 
     private fun merge(
