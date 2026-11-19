@@ -31,23 +31,23 @@ class BookMetadataFetcher(
         val slugTitleHint = extractAmazonSlugTitle(effectiveInput)
 
         if (candidates.isEmpty() && slugTitleHint.isNullOrBlank()) {
-            return FetchResult.Error(
+            return@withContext FetchResult.Error(
                 "Ungültige Eingabe – erwartet ISBN (10/13 Zeichen), ASIN (z. B. B0…), Amazon-Link oder Goodreads-ID (Zahl)."
             )
         }
-        return try {
+        try {
             for ((kind, value) in candidates) {
                 val metadata = when (kind) {
                     IdentifierKind.ISBN -> fetchIsbnMetadata(value)
                     IdentifierKind.ASIN -> fetchAsinMetadata(value)
                     IdentifierKind.GOODREADS -> olSearchFirst("id_goodreads:$value")?.toMetadata()?.enrichMetadata()
                 }
-                if (metadata != null && metadata.title.isNotBlank()) return FetchResult.Success(metadata)
+                if (metadata != null && metadata.title.isNotBlank()) return@withContext FetchResult.Success(metadata)
             }
             if (!slugTitleHint.isNullOrBlank()) {
                 val bySlug = searchAndRankByTitleAuthor(slugTitleHint, "", maxResults = 8).firstOrNull()
                 if (bySlug != null && bySlug.title.isNotBlank()) {
-                    return FetchResult.Success(bySlug)
+                    return@withContext FetchResult.Success(bySlug)
                 }
             }
             FetchResult.NotFound
