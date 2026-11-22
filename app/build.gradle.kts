@@ -19,8 +19,8 @@ android {
         applicationId = "com.gideon.buecherwelt"
         minSdk = 26
         targetSdk = 37
-        versionCode = 16
-        versionName = "1.7.0"
+        versionCode = 17
+        versionName = "1.7.1"
         buildConfigField("String", "GOOGLE_BOOKS_API_KEY", "\"${System.getenv("GOOGLE_BOOKS_API_KEY") ?: ""}\"")
     }
 

@@ -188,7 +188,7 @@ class AddBookViewModel(
             when (val result = metadataFetcher.fetchByIsbn(rawIsbn)) {
                 is FetchResult.Success -> applyMetadata(result.metadata, rawIsbn)
                 is FetchResult.NotFound -> {
-                    if (isAsin && llmConfig.isConfigured) {
+                    if (llmConfig.isConfigured) {
                         val aiResolved = runAiCompletionInternal(identifier = rawIsbn.trim())
                         if (aiResolved) return@launch
                     }
@@ -196,9 +196,9 @@ class AddBookViewModel(
                         it.copy(
                             loading = false,
                             error = if (isAsin) {
-                                "Zu dieser ASIN wurden keine Katalogdaten gefunden (Open Library, Google Books & Audnex geprüft). Tipp: Nutze die Titel-Suche oder fülle Titel + Autor:in mit KI aus."
+                                "Zu dieser ASIN wurden keine Katalogdaten gefunden (Open Library, Google Books, Audnex & Goodreads geprüft). Tipp: Nutze die Titel-Suche oder fülle Titel + Autor:in mit KI aus."
                             } else {
-                                "Zu dieser Kennung wurden keine Daten gefunden (Google Books, Open Library und DNB geprüft). Tipp: Nutze die Titel-Suche oder lege das Buch unten manuell an."
+                                "Zu dieser ISBN wurden keine Daten gefunden (Google Books, Open Library, DNB, Apple Books & Goodreads geprüft). Tipp: Prüfe die Ziffern, nutze die Titel-Suche oder lege das Buch unten manuell an."
                             }
                         )
                     }

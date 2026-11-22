@@ -105,30 +105,61 @@ class BookMetadataFetcher(
 
     private suspend fun fetchIsbnMetadata(isbn: String): BookMetadata? {
         val variants = isbnVariants(isbn)
+        var anyNetworkSuccess = false
+        var hadIoError = false
+
+        suspend fun <T> trySource(block: suspend () -> T): T? = withContext(Dispatchers.IO) {
+            try {
+                val res = block()
+                anyNetworkSuccess = true
+                res
+            } catch (_: IOException) {
+                hadIoError = true
+                null
+            } catch (_: HttpException) {
+                anyNetworkSuccess = true
+                null
+            } catch (_: Exception) {
+                null
+            }
+        }
+
         var gb: GbVolumeInfo? = null
         var ol: OlBook? = null
         var olAuthors: List<String> = emptyList()
         var olSearch: BookMetadata? = null
+
         for (v in variants) {
             if (gb == null) {
-                gb = callApi { googleBooksApi.searchByIsbn("isbn:$v").items.firstOrNull()?.volumeInfo }
+                gb = trySource { googleBooksApi.searchByIsbn("isbn:$v").items.firstOrNull()?.volumeInfo }
+            }
+            if (gb == null) {
+                gb = trySource {
+                    val items = googleBooksApi.search(v, 5).items
+                    items.firstOrNull { item ->
+                        item.volumeInfo?.industryIdentifiers.orEmpty().any { id ->
+                            normalizeIsbn(id.identifier.orEmpty()) in variants
+                        }
+                    }?.volumeInfo ?: items.firstOrNull()?.volumeInfo
+                }
             }
             if (ol == null) {
-                ol = callApi { openLibraryApi.getByIsbn(v) }
+                ol = trySource { openLibraryApi.getByIsbn(v) }
                 if (ol != null) {
                     olAuthors = ol!!.authors.orEmpty().mapNotNull { ref ->
                         ref.key?.substringAfterLast('/')?.let { key ->
-                            callApi { openLibraryApi.getAuthor(key)?.name }
+                            trySource { openLibraryApi.getAuthor(key)?.name }
                         }
                     }
                 }
             }
             if (olSearch == null) {
-                val doc = olSearchFirst("isbn:$v")
+                val doc = trySource { openLibraryApi.search("isbn:$v", 5) }?.docs?.firstOrNull()
                 if (doc != null && !doc.title.isNullOrBlank()) olSearch = doc.toMetadata()
             }
-            if (gb != null && ol != null && olSearch != null) break
+            if (gb != null && (ol != null || olSearch != null)) break
         }
+
         var metadata = merge(isbn = isbn, gb = gb, ol = ol, olAuthors = olAuthors)
         if (olSearch != null) {
             val s = olSearch!!
@@ -145,9 +176,11 @@ class BookMetadataFetcher(
                 seriesHints = (metadata.seriesHints + s.seriesHints).distinct()
             )
         }
+
+        // Fallback 1: Deutsche Nationalbibliothek (DNB) – ideal für deutsche Bücher
         if (metadata.title.isBlank()) {
             for (v in variants) {
-                val dnb = fetchDnb(v)
+                val dnb = trySource { fetchDnbRaw(v) }
                 if (dnb != null && dnb.title.isNotBlank()) {
                     metadata = metadata.copy(
                         title = dnb.title,
@@ -162,9 +195,72 @@ class BookMetadataFetcher(
                 }
             }
         }
-        // If ISBN lookup found title/author but lacked coverUrl or description, enrich via title+author search!
+
+        // Fallback 2: Apple Books (iTunes Lookup API nach ISBN)
+        if (metadata.title.isBlank()) {
+            for (v in variants) {
+                val apple = trySource { fetchItunesByIsbnRaw(v) }
+                if (apple != null && apple.title.isNotBlank()) {
+                    metadata = metadata.copy(
+                        title = apple.title,
+                        subtitle = metadata.subtitle.ifBlank { apple.subtitle },
+                        author = metadata.author.ifBlank { apple.author },
+                        publisher = metadata.publisher.ifBlank { apple.publisher },
+                        publishedYear = metadata.publishedYear ?: apple.publishedYear,
+                        description = metadata.description.ifBlank { apple.description },
+                        categories = metadata.categories.ifEmpty { apple.categories },
+                        coverUrl = metadata.coverUrl ?: apple.coverUrl,
+                        language = metadata.language.ifBlank { apple.language }
+                    )
+                    break
+                }
+            }
+        }
+
+        // Fallback 3: Goodreads Autocomplete (große Abdeckung für Indie-, Romance- & Neuerscheinungen)
+        if (metadata.title.isBlank()) {
+            for (v in variants) {
+                val gr = trySource { fetchGoodreadsBooksRaw(v).firstOrNull() }
+                if (gr != null && gr.title.isNotBlank()) {
+                    metadata = metadata.copy(
+                        title = gr.title,
+                        author = metadata.author.ifBlank { gr.author },
+                        coverUrl = metadata.coverUrl ?: gr.coverUrl,
+                        pageCount = metadata.pageCount ?: gr.pageCount
+                    )
+                    break
+                }
+            }
+        }
+
+        // Fallback 4: Öffentliche Amazon-Metadaten für ISBN-10 (entspricht Print-ASIN, strikt CAPTCHA-frei)
+        if (metadata.title.isBlank()) {
+            val isbn10 = variants.firstOrNull { it.length == 10 }
+            if (isbn10 != null) {
+                val amz = trySource { fetchAmazonPublicMeta(isbn10) }
+                if (amz != null && amz.title.isNotBlank()) {
+                    metadata = metadata.copy(
+                        title = amz.title,
+                        author = metadata.author.ifBlank { amz.author },
+                        description = metadata.description.ifBlank { amz.description },
+                        coverUrl = metadata.coverUrl ?: amz.coverUrl
+                    )
+                }
+            }
+        }
+
+        // Nur dann NoNetwork melden, wenn wirklich KEINE einzige Quelle erreichbar war
+        if (metadata.title.isBlank() && hadIoError && !anyNetworkSuccess) {
+            throw NoNetworkException()
+        }
+
+        // Wenn Titel gefunden wurde, aber Cover oder Klappentext fehlen: über Titel+Autor anreichern
         if (metadata.title.isNotBlank() && (metadata.coverUrl.isNullOrBlank() || metadata.description.isBlank())) {
-            val enriched = searchAndRankByTitleAuthor(metadata.title, metadata.author).firstOrNull()
+            val enriched = try {
+                searchAndRankByTitleAuthor(metadata.title, metadata.author).firstOrNull()
+            } catch (_: Exception) {
+                null
+            }
             if (enriched != null) {
                 metadata = metadata.copy(
                     subtitle = metadata.subtitle.ifBlank { enriched.subtitle },
@@ -186,6 +282,40 @@ class BookMetadataFetcher(
             )
         }
         return metadata
+    }
+
+    private fun fetchDnbRaw(isbn: String): BookMetadata? {
+        val cql = "isbn=$isbn"
+        val encoded = java.net.URLEncoder.encode(cql, "UTF-8").replace("+", "%20")
+        val url = "https://services.dnb.de/sru/dnb?version=1.1&operation=searchRetrieve" +
+            "&query=$encoded&recordSchema=oai_dc&maximumRecords=5"
+        val body = okHttpClient.newCall(Request.Builder().url(url).build()).execute().use { resp ->
+            if (resp.isSuccessful) resp.body?.string() else null
+        } ?: return null
+        return parseDnbDc(body, isbn)
+    }
+
+    private fun fetchItunesByIsbnRaw(isbn: String): BookMetadata? {
+        for (country in listOf("de", "us")) {
+            val url = "https://itunes.apple.com/lookup?isbn=$isbn&country=$country"
+            val body = okHttpClient.newCall(Request.Builder().url(url).build()).execute().use { resp ->
+                if (resp.isSuccessful) resp.body?.string() else null
+            } ?: continue
+            val parsed = parseItunesJson(body, country).firstOrNull()
+            if (parsed != null && parsed.title.isNotBlank()) {
+                return parsed.copy(isbn = isbn)
+            }
+        }
+        return null
+    }
+
+    private fun fetchGoodreadsBooksRaw(query: String): List<BookMetadata> {
+        val encoded = java.net.URLEncoder.encode(query, "UTF-8")
+        val url = "https://www.goodreads.com/book/auto_complete?format=json&q=$encoded"
+        val body = okHttpClient.newCall(Request.Builder().url(url).build()).execute().use { resp ->
+            if (resp.isSuccessful) resp.body?.string() else null
+        } ?: return emptyList()
+        return parseGoodreadsJson(body)
     }
 
     private suspend fun fetchDnb(isbn: String): BookMetadata? =
@@ -216,21 +346,27 @@ class BookMetadataFetcher(
         val isbns = mutableListOf<String>()
         var event = parser.eventType
         while (event != XmlPullParser.END_DOCUMENT && records <= 1) {
-            if (event == XmlPullParser.START_TAG) {
-                tag = parser.name.substringAfterLast(':')
-                if (tag == "record") records++
-            } else if (event == XmlPullParser.TEXT) {
-                val text = parser.text?.trim().orEmpty()
-                if (text.isNotEmpty()) {
-                    when (tag) {
-                        "title" -> if (title.isEmpty()) title = text
-                        "creator" -> if (creator.isEmpty()) creator = text
-                        "publisher" -> if (publisher.isEmpty()) publisher = text
-                        "date" -> if (date.isEmpty()) date = text
-                        "subject" -> if (subjects.size < 6) subjects += text
-                        "identifier" -> {
-                            val normalized = normalizeIsbn(text)
-                            if (normalized != null && normalized !in isbns) isbns += normalized
+            when (event) {
+                XmlPullParser.START_TAG -> {
+                    tag = parser.name.substringAfterLast(':')
+                    if (tag == "record") records++
+                }
+                XmlPullParser.END_TAG -> {
+                    tag = ""
+                }
+                XmlPullParser.TEXT -> {
+                    val text = parser.text?.trim().orEmpty()
+                    if (text.isNotEmpty() && tag.isNotEmpty()) {
+                        when (tag) {
+                            "title" -> if (title.isEmpty()) title = text
+                            "creator" -> if (creator.isEmpty()) creator = text
+                            "publisher" -> if (publisher.isEmpty()) publisher = text
+                            "date" -> if (date.isEmpty()) date = text
+                            "subject" -> if (subjects.size < 6) subjects += text
+                            "identifier" -> {
+                                val normalized = normalizeIsbn(text)
+                                if (normalized != null && normalized !in isbns) isbns += normalized
+                            }
                         }
                     }
                 }
@@ -391,33 +527,35 @@ class BookMetadataFetcher(
                 if (resp.isSuccessful) resp.body?.string() else null
             }
         } ?: return emptyList()
-        return try {
-            val arr = org.json.JSONArray(body)
-            buildList {
-                for (i in 0 until arr.length()) {
-                    val obj = arr.optJSONObject(i) ?: continue
-                    val title = obj.optString("bookTitleBare").trim()
-                        .ifBlank { obj.optString("title").trim() }
-                    if (title.isBlank()) continue
-                    val author = obj.optJSONObject("author")?.optString("name")?.trim().orEmpty()
-                    val rawImg = obj.optString("imageUrl").trim()
-                    val cover = rawImg
-                        .takeIf { it.isNotBlank() && !it.contains("nophoto") }
-                        ?.replace(Regex("\\._S[XY]\\d+_\\."), "._SX600_.")
-                    val pages = obj.optInt("numPages", 0).takeIf { it > 0 }
-                    add(
-                        BookMetadata(
-                            title = title,
-                            author = author,
-                            coverUrl = cover,
-                            pageCount = pages
-                        )
+        return parseGoodreadsJson(body)
+    }
+
+    private fun parseGoodreadsJson(body: String): List<BookMetadata> = try {
+        val arr = org.json.JSONArray(body)
+        buildList {
+            for (i in 0 until arr.length()) {
+                val obj = arr.optJSONObject(i) ?: continue
+                val title = obj.optString("bookTitleBare").trim()
+                    .ifBlank { obj.optString("title").trim() }
+                if (title.isBlank()) continue
+                val author = obj.optJSONObject("author")?.optString("name")?.trim().orEmpty()
+                val rawImg = obj.optString("imageUrl").trim()
+                val cover = rawImg
+                    .takeIf { it.isNotBlank() && !it.contains("nophoto") }
+                    ?.replace(Regex("\\._S[XY]\\d+_\\."), "._SX600_.")
+                val pages = obj.optInt("numPages", 0).takeIf { it > 0 }
+                add(
+                    BookMetadata(
+                        title = title,
+                        author = author,
+                        coverUrl = cover,
+                        pageCount = pages
                     )
-                }
+                )
             }
-        } catch (_: Exception) {
-            emptyList()
         }
+    } catch (_: Exception) {
+        emptyList()
     }
 
     private suspend fun fetchItunesBooks(query: String, limit: Int = 10): List<BookMetadata> {
@@ -430,49 +568,55 @@ class BookMetadataFetcher(
                     if (resp.isSuccessful) resp.body?.string() else null
                 }
             } ?: continue
-            try {
-                val obj = org.json.JSONObject(body)
-                val arr = obj.optJSONArray("results") ?: continue
-                for (i in 0 until arr.length()) {
-                    val item = arr.optJSONObject(i) ?: continue
-                    val title = item.optString("trackName").trim()
-                    if (title.isBlank()) continue
-                    val author = item.optString("artistName").trim()
-                    val desc = item.optString("description")
-                        .replace(Regex("<[^>]+>"), " ")
-                        .replace(Regex("\\s+"), " ")
-                        .trim()
-                    val art = item.optString("artworkUrl100").trim()
-                        .ifBlank { item.optString("artworkUrl60").trim() }
-                        .replace("100x100bb", "600x600bb")
-                        .replace("60x60bb", "600x600bb")
-                        .ifBlank { null }
-                    val year = parseYear(item.optString("releaseDate"))
-                    val genresArr = item.optJSONArray("genres")
-                    val cats = buildList {
-                        if (genresArr != null) {
-                            for (g in 0 until genresArr.length()) {
-                                val name = genresArr.optString(g).trim()
-                                if (name.isNotBlank() && !name.equals("Books", ignoreCase = true) && !name.equals("Bücher", ignoreCase = true)) {
-                                    add(name)
-                                }
+            result += parseItunesJson(body, country)
+            if (result.isNotEmpty()) break
+        }
+        return result
+    }
+
+    private fun parseItunesJson(body: String, country: String): List<BookMetadata> {
+        val result = mutableListOf<BookMetadata>()
+        try {
+            val obj = org.json.JSONObject(body)
+            val arr = obj.optJSONArray("results") ?: return emptyList()
+            for (i in 0 until arr.length()) {
+                val item = arr.optJSONObject(i) ?: continue
+                val title = item.optString("trackName").trim()
+                if (title.isBlank()) continue
+                val author = item.optString("artistName").trim()
+                val desc = item.optString("description")
+                    .replace(Regex("<[^>]+>"), " ")
+                    .replace(Regex("\\s+"), " ")
+                    .trim()
+                val art = item.optString("artworkUrl100").trim()
+                    .ifBlank { item.optString("artworkUrl60").trim() }
+                    .replace("100x100bb", "600x600bb")
+                    .replace("60x60bb", "600x600bb")
+                    .ifBlank { null }
+                val year = parseYear(item.optString("releaseDate"))
+                val genresArr = item.optJSONArray("genres")
+                val cats = buildList {
+                    if (genresArr != null) {
+                        for (g in 0 until genresArr.length()) {
+                            val name = genresArr.optString(g).trim()
+                            if (name.isNotBlank() && !name.equals("Books", ignoreCase = true) && !name.equals("Bücher", ignoreCase = true)) {
+                                add(name)
                             }
                         }
-                    }.distinct().take(6)
-                    result += BookMetadata(
-                        title = title,
-                        author = author,
-                        publishedYear = year,
-                        description = desc,
-                        categories = cats,
-                        coverUrl = art,
-                        language = if (country == "de") "de" else "en"
-                    )
-                }
-            } catch (_: Exception) {
-                // ignore malformed item
+                    }
+                }.distinct().take(6)
+                result += BookMetadata(
+                    title = title,
+                    author = author,
+                    publishedYear = year,
+                    description = desc,
+                    categories = cats,
+                    coverUrl = art,
+                    language = if (country == "de") "de" else "en"
+                )
             }
-            if (result.isNotEmpty()) break
+        } catch (_: Exception) {
+            // ignore malformed item
         }
         return result
     }
@@ -972,20 +1116,42 @@ class BookMetadataFetcher(
                 val check = (11 - sum % 11) % 11
                 result += core + (if (check == 10) "X" else check.toString())
             } else if (isbn.length == 10) {
-                val core = isbn.take(9)
-                val sum = core.mapIndexed { i, c -> c.digitToInt() * (1 + 2 * i) }.sum()
+                val full12 = "978${isbn.take(9)}"
+                val sum = full12.mapIndexed { i, c -> c.digitToInt() * if (i % 2 == 0) 1 else 3 }.sum()
                 val check = (10 - sum % 10) % 10
-                result += "978$core$check"
+                result += "$full12$check"
             }
             return result
         }
 
         fun normalizeIsbn(raw: String): String? {
-            val cleaned = raw.trim().uppercase().filter { it.isDigit() || it == 'X' }
-            if (cleaned.length != 10 && cleaned.length != 13) return null
-            if (cleaned.length == 10 && cleaned.dropLast(1).any { !it.isDigit() }) return null
-            if (cleaned.length == 13 && cleaned.any { !it.isDigit() }) return null
-            return cleaned
+            // Entferne typische Präfixe wie "ISBN-13:", "ISBN-10:", "ISBN", "EAN-13:", "EAN:"
+            val withoutPrefix = raw.trim()
+                .replace(Regex("(?i)\\b(?:ISBN|EAN)(?:[-\\s]?(?:13|10))?\\s*[:=]?\\s*"), "")
+            val cleaned = withoutPrefix.uppercase().filter { it.isDigit() || it == 'X' }
+
+            // EAN-13 mit 2- oder 5-stelligem Preis-Zusatz (z. B. 978342321999051299)
+            if (cleaned.length in listOf(15, 18) &&
+                (cleaned.startsWith("978") || cleaned.startsWith("979")) &&
+                cleaned.take(13).all { it.isDigit() }
+            ) {
+                return cleaned.take(13)
+            }
+            if (cleaned.length == 13 && cleaned.all { it.isDigit() }) return cleaned
+            if (cleaned.length == 10 && cleaned.dropLast(1).all { it.isDigit() }) return cleaned
+
+            // Fallback: eingebettete 13-stellige (978/979) oder 10-stellige ISBN mit Bindestrichen/Leerzeichen extrahieren
+            val embedded13 = Regex("(97[89](?:[-\\s–—−]?\\d){10})").find(withoutPrefix)?.groupValues?.get(1)
+            if (embedded13 != null) {
+                val d13 = embedded13.filter { it.isDigit() }
+                if (d13.length == 13) return d13
+            }
+            val embedded10 = Regex("((?:\\d[-\\s–—−]?){9}[\\dXx])").find(withoutPrefix)?.groupValues?.get(1)
+            if (embedded10 != null) {
+                val d10 = embedded10.uppercase().filter { it.isDigit() || it == 'X' }
+                if (d10.length == 10 && d10.dropLast(1).all { it.isDigit() }) return d10
+            }
+            return null
         }
 
         fun parseYear(raw: String?): Int? =

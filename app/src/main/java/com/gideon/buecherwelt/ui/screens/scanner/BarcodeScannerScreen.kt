@@ -133,18 +133,29 @@ private fun processFrame(imageProxy: ImageProxy, onResult: (String) -> Unit) {
     val image = InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
     BarcodeScanning.getClient().process(image)
         .addOnSuccessListener { barcodes ->
-            val value = barcodes.firstNotNullOfOrNull { barcode ->
+            val candidates = barcodes.mapNotNull { barcode ->
                 when (barcode.format) {
                     Barcode.FORMAT_EAN_13,
-                    Barcode.FORMAT_EAN_8,
                     Barcode.FORMAT_UPC_A,
-                    Barcode.FORMAT_UPC_E,
                     Barcode.FORMAT_CODE_128,
-                    Barcode.FORMAT_CODE_39 -> barcode.rawValue
+                    Barcode.FORMAT_CODE_39 -> barcode.rawValue?.trim()
+                    else -> null
+                }
+            }.filter { it.isNotBlank() }
+
+            // 1. Bevorzuge gültige ISBN-13 (978/979, auch mit 2-/5-stelligem Preis-Zusatz) oder ISBN-10
+            val isbnMatch = candidates.firstNotNullOfOrNull { raw ->
+                val digits = raw.uppercase().filter { it.isDigit() || it == 'X' }
+                when {
+                    digits.length >= 13 && (digits.startsWith("978") || digits.startsWith("979")) &&
+                        digits.take(13).all { it.isDigit() } -> digits.take(13)
+                    digits.length == 10 && digits.dropLast(1).all { it.isDigit() } -> digits
                     else -> null
                 }
             }
-            if (value != null) onResult(value)
+            if (isbnMatch != null) {
+                onResult(isbnMatch)
+            }
         }
         .addOnCompleteListener { imageProxy.close() }
 }
