@@ -52,11 +52,17 @@ import com.gideon.buecherwelt.ui.viewModelFactory
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
-fun StatsScreen(container: AppContainer) {
+fun StatsScreen(
+    container: AppContainer,
+    navController: androidx.navigation.NavController? = null
+) {
     val viewModel: StatsViewModel = viewModel(
         factory = viewModelFactory { StatsViewModel(container.bookRepository) }
     )
-    val profile by viewModel.profile.collectAsStateWithLifecycle()
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val profile = uiState.profile
+    val dna = uiState.readingDna
+    val seriesProgress = uiState.seriesProgress
 
     Scaffold(
         topBar = {
@@ -218,6 +224,138 @@ fun StatsScreen(container: AppContainer) {
                     }
                 }
             }
+
+            // Lese-DNA & Lesezeit-Prognose
+            item {
+                SectionHeader("Lese-DNA & Zeit-Prognose")
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = MaterialTheme.shapes.large,
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                ) {
+                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Column {
+                                Text("Gelesen (geschätzt)", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text(
+                                    text = "${dna.totalReadPages} Seiten · ca. ${"%.1f".format(dna.estimatedReadHours)} Std.",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                            if (dna.avgPageCount != null) {
+                                Column(horizontalAlignment = Alignment.End) {
+                                    Text("Ø Buchlänge", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Text(
+                                        text = "${dna.avgPageCount} Seiten",
+                                        style = MaterialTheme.typography.titleSmall,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                        }
+                        if (dna.subBookCount > 0) {
+                            Text(
+                                text = "Dein SuB (${dna.subBookCount} geplante ${if (dna.subBookCount == 1) "Werk" else "Werke"}) entspricht ca. ${"%.1f".format(dna.estimatedSubHours)} Std. Lesestoff.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        if (dna.topMoods.isNotEmpty()) {
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                            Text(
+                                text = "Deine bevorzugten Stimmungen",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            ChipList(dna.topMoods.map { "✨ ${it.first}" })
+                        }
+                    }
+                }
+            }
+
+            // Reihen-Fortschritt & Lücken-Check
+            if (seriesProgress.isNotEmpty()) {
+                item {
+                    SectionHeader("Reihen-Fortschritt & Lücken-Check (${seriesProgress.size})")
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = MaterialTheme.shapes.large,
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            seriesProgress.take(8).forEachIndexed { idx, sp ->
+                                if (idx > 0) {
+                                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                                }
+                                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = sp.seriesName,
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            fontFamily = PlayfairDisplay,
+                                            fontWeight = FontWeight.Bold,
+                                            modifier = Modifier.weight(1f)
+                                        )
+                                        Text(
+                                            text = "${sp.readCount}/${sp.totalOwned} gelesen",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.primary,
+                                            fontWeight = FontWeight.SemiBold
+                                        )
+                                    }
+                                    LinearProgressIndicator(
+                                        progress = { sp.progressFraction },
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(6.dp)
+                                            .clip(CircleShape)
+                                    )
+                                    if (sp.nextUnreadBook != null) {
+                                        val nextBook = sp.nextUnreadBook
+                                        Text(
+                                            text = "📖 Nächster Band: ${nextBook.title}" +
+                                                (nextBook.seriesIndex?.let { " (#$it)" } ?: ""),
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.let { mod ->
+                                                if (navController != null) {
+                                                    mod.clickable {
+                                                        navController.navigate(
+                                                            com.gideon.buecherwelt.ui.navigation.Screen.BookDetail.create(nextBook.id)
+                                                        )
+                                                    }
+                                                } else mod
+                                            }
+                                        )
+                                    }
+                                    if (sp.missingIndices.isNotEmpty()) {
+                                        Text(
+                                            text = "⚠️ Fehlend im Regal: ${sp.missingIndices.joinToString(", ") { "Band $it" }}",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.error
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
             item {
                 SectionHeader("Top-Genres")
                 ChipList(profile.topGenres.map { "${it.first} (${it.second})" })
@@ -326,7 +464,17 @@ fun StatsScreen(container: AppContainer) {
                         } else {
                             profile.favorites.forEach { book ->
                                 Row(
-                                    modifier = Modifier.fillMaxWidth(),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .let { mod ->
+                                            if (navController != null) {
+                                                mod.clickable {
+                                                    navController.navigate(
+                                                        com.gideon.buecherwelt.ui.navigation.Screen.BookDetail.create(book.id)
+                                                    )
+                                                }
+                                            } else mod
+                                        },
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {

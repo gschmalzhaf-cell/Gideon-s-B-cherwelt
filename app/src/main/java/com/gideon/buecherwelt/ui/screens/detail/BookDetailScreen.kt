@@ -121,6 +121,7 @@ fun BookDetailScreen(
     val book by viewModel.book.collectAsStateWithLifecycle()
     val allTropes by viewModel.allTropes.collectAsStateWithLifecycle()
     val localFit by viewModel.localFit.collectAsStateWithLifecycle()
+    val localSimilarBooks by viewModel.localSimilarBooks.collectAsStateWithLifecycle()
     val characteristics by viewModel.characteristics.collectAsStateWithLifecycle()
     val similar by viewModel.similar.collectAsStateWithLifecycle()
     val similarLoading by viewModel.similarLoading.collectAsStateWithLifecycle()
@@ -987,9 +988,77 @@ fun BookDetailScreen(
                 }
             }
 
-            // 8. ÄHNLICHE BÜCHER
+            // 8. ÄHNLICHE BÜCHER (Offline im eigenen Regal + Online entdecken)
             item {
-                SectionHeader("Ähnliche Bücher")
+                if (localSimilarBooks.isNotEmpty()) {
+                    SectionHeader("Ähnliche Bücher in deinem Regal")
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    ) {
+                        items(localSimilarBooks, key = { "local_sim_${it.book.id}" }) { sim ->
+                            Card(
+                                modifier = Modifier
+                                    .width(210.dp)
+                                    .clickable { navController.navigate(Screen.BookDetail.create(sim.book.id)) },
+                                shape = MaterialTheme.shapes.large,
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+                                border = BorderStroke(0.8.dp, MaterialTheme.colorScheme.outlineVariant)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(10.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    BookCover(
+                                        coverPath = sim.book.coverPath,
+                                        coverUrl = sim.book.coverUrl,
+                                        contentDescription = sim.book.title,
+                                        title = sim.book.title,
+                                        author = sim.book.author,
+                                        cornerRadius = 6.dp,
+                                        modifier = Modifier
+                                            .width(44.dp)
+                                            .aspectRatio(2f / 3f)
+                                    )
+                                    Column(modifier = Modifier.padding(start = 10.dp)) {
+                                        Surface(
+                                            color = MaterialTheme.colorScheme.primaryContainer,
+                                            shape = CircleShape
+                                        ) {
+                                            Text(
+                                                text = "${sim.matchPercent}% Match",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                                fontWeight = FontWeight.Bold,
+                                                modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
+                                            )
+                                        }
+                                        Spacer(Modifier.height(4.dp))
+                                        Text(
+                                            text = sim.book.title,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            fontFamily = PlayfairDisplay,
+                                            fontWeight = FontWeight.Bold,
+                                            maxLines = 2,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                        if (sim.reasons.isNotEmpty()) {
+                                            Text(
+                                                text = sim.reasons.joinToString(" · "),
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = MaterialTheme.colorScheme.primary,
+                                                maxLines = 2,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                SectionHeader("Ähnliche Bücher (Online entdecken)")
                 OutlinedButton(
                     onClick = { similarRequested = true },
                     enabled = !similarLoading
@@ -1000,7 +1069,7 @@ fun BookDetailScreen(
                         Icon(Icons.Default.Refresh, contentDescription = null)
                     }
                     Spacer(Modifier.width(8.dp))
-                    Text("Ähnliche Bücher laden")
+                    Text("Ähnliche Bücher online laden")
                 }
                 if (similarError != null) {
                     Text(

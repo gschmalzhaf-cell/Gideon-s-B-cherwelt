@@ -58,9 +58,15 @@ class BookDetailViewModel(
         if (current == null) null
         else {
             val profile = ReadingStatsCalculator.compute(all.filter { it.id != current.id })
-            ReadingStatsCalculator.computeLocalFit(current, profile)
+            ReadingStatsCalculator.computeLocalFit(current, profile, all)
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+
+    val localSimilarBooks: StateFlow<List<com.gideon.buecherwelt.domain.analysis.SimilarLocalBook>> =
+        combine(book, bookRepository.observeBooks()) { current, all ->
+            if (current == null) emptyList()
+            else com.gideon.buecherwelt.domain.analysis.SmartLibraryEngine.findSimilarInLibrary(current, all)
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val characteristics: StateFlow<ReadingStatsCalculator.BookCharacteristics?> = combine(
         book,

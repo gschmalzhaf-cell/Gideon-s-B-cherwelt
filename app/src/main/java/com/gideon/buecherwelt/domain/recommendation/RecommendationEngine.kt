@@ -67,29 +67,44 @@ class RecommendationEngine(
         var score = 0
         val reasons = mutableListOf<String>()
         val categories = metadata.categories.map { it.lowercase() }
+        val descLower = metadata.description.take(1200).lowercase()
+        val inferred = com.gideon.buecherwelt.domain.analysis.ReadingStatsCalculator.inferBookIntelligence(
+            title = metadata.title,
+            description = metadata.description.take(1200),
+            categories = metadata.categories,
+            catalog = emptyList()
+        )
+        val inferredGenresLower = inferred.genres.map { it.lowercase() }
+        val inferredTropesLower = inferred.tropes.map { it.lowercase() }
+
         profile.topAuthors.forEach { (author, _) ->
             if (author.equals(metadata.author, ignoreCase = true) ||
                 metadata.author.contains(author, ignoreCase = true)
             ) {
-                score += 3
+                score += 4
                 reasons.add("Autor:in aus deinen Favoriten: $author")
             }
         }
         profile.topGenres.forEach { (genre, _) ->
-            if (categories.any { it.contains(genre.lowercase()) } ||
+            val gLower = genre.lowercase()
+            if (categories.any { it.contains(gLower) } ||
+                inferredGenresLower.any { it.contains(gLower) || gLower.contains(it) } ||
                 genre.equals(metadata.genreHint(), ignoreCase = true)
             ) {
-                score += 2
+                score += 3
                 reasons.add("Genre passt zu deinen Top-Genres: $genre")
             }
         }
-        val overlap = profile.topTropes.count { (trope, _) ->
+        val matchedTropes = profile.topTropes.map { it.first }.filter { trope ->
+            val tLower = trope.lowercase()
             metadata.title.contains(trope, ignoreCase = true) ||
-                categories.any { it.contains(trope.lowercase()) }
+                categories.any { it.contains(tLower) } ||
+                inferredTropesLower.any { it == tLower } ||
+                descLower.contains(tLower)
         }
-        if (overlap > 0) {
-            score += overlap
-            reasons.add("Themen aus deinen Top-Tropes")
+        if (matchedTropes.isNotEmpty()) {
+            score += (matchedTropes.size * 2).coerceAtMost(6)
+            reasons.add("Passt zu deinen Top-Tropes: ${matchedTropes.take(2).joinToString(", ")}")
         }
         profile.topPublishers.forEach { (publisher, _) ->
             if (publisher.equals(metadata.publisher, ignoreCase = true)) {
@@ -97,23 +112,33 @@ class RecommendationEngine(
                 reasons.add("Verlag aus deinen Favoriten: $publisher")
             }
         }
+        if (profile.avgSpice != null && inferred.spice != null && inferred.spice > 0) {
+            val diff = kotlin.math.abs(profile.avgSpice - inferred.spice)
+            if (diff <= 1.0) score += 1
+            else if (diff >= 2.8) score -= 1
+        }
         profile.dislikedAuthors.forEach { (author, _) ->
             if (author.equals(metadata.author, ignoreCase = true) ||
                 metadata.author.contains(author, ignoreCase = true)
             ) {
-                score -= 3
+                score -= 4
             }
         }
         profile.dislikedGenres.forEach { (genre, _) ->
-            if (categories.any { it.contains(genre.lowercase()) } ||
+            val gLower = genre.lowercase()
+            if (categories.any { it.contains(gLower) } ||
+                inferredGenresLower.any { it.contains(gLower) } ||
                 genre.equals(metadata.genreHint(), ignoreCase = true)
             ) {
                 score -= 2
             }
         }
         val dislikedOverlap = profile.dislikedTropes.count { (trope, _) ->
+            val tLower = trope.lowercase()
             metadata.title.contains(trope, ignoreCase = true) ||
-                categories.any { it.contains(trope.lowercase()) }
+                categories.any { it.contains(tLower) } ||
+                inferredTropesLower.any { it == tLower } ||
+                descLower.contains(tLower)
         }
         score -= 2 * dislikedOverlap
         return score to reasons.distinct()
@@ -122,22 +147,38 @@ class RecommendationEngine(
     private fun scoreAgainstBook(metadata: BookMetadata, book: Book): Pair<Int, List<String>> {
         var score = 0
         val reasons = mutableListOf<String>()
+        val descLower = metadata.description.take(1200).lowercase()
+        val inferred = com.gideon.buecherwelt.domain.analysis.ReadingStatsCalculator.inferBookIntelligence(
+            title = metadata.title,
+            description = metadata.description.take(1200),
+            categories = metadata.categories,
+            catalog = emptyList()
+        )
+        val inferredGenresLower = inferred.genres.map { it.lowercase() }
+        val inferredTropesLower = inferred.tropes.map { it.lowercase() }
+
         if (book.author.isNotBlank() && metadata.author.contains(book.author, ignoreCase = true)) {
             score += 4
             reasons.add("Gleiche Autor:in: ${book.author}")
         }
         val categories = metadata.categories.map { it.lowercase() }
-        if (book.genre.isNotBlank() && categories.any { it.contains(book.genre.lowercase()) }) {
-            score += 3
-            reasons.add("Genre: ${book.genre}")
+        if (book.genre.isNotBlank()) {
+            val gLower = book.genre.lowercase()
+            if (categories.any { it.contains(gLower) } || inferredGenresLower.any { it.contains(gLower) }) {
+                score += 3
+                reasons.add("Genre: ${book.genre}")
+            }
         }
-        val tropeHits = book.tropes.count { trope ->
-            metadata.title.contains(trope.name, ignoreCase = true) ||
-                categories.any { it.contains(trope.name.lowercase()) }
+        val matchedTropes = book.tropes.map { it.name }.filter { tName ->
+            val tLower = tName.lowercase()
+            metadata.title.contains(tName, ignoreCase = true) ||
+                categories.any { it.contains(tLower) } ||
+                inferredTropesLower.any { it == tLower } ||
+                descLower.contains(tLower)
         }
-        if (tropeHits > 0) {
-            score += 2 * tropeHits
-            reasons.add("Ähnliche Tropes/Themen")
+        if (matchedTropes.isNotEmpty()) {
+            score += (2 * matchedTropes.size).coerceAtMost(8)
+            reasons.add("Ähnliche Tropes: ${matchedTropes.take(2).joinToString(", ")}")
         }
         if (book.publisher.isNotBlank() && book.publisher.equals(metadata.publisher, ignoreCase = true)) {
             score += 2

@@ -109,7 +109,10 @@ object LlmPrompts {
         return system to user
     }
 
-    fun bookRecommendations(profile: ReadingProfile): Pair<String, String> {
+    fun bookRecommendations(
+        profile: ReadingProfile,
+        ownedTitles: List<String> = emptyList()
+    ): Pair<String, String> {
         val system = """
             Du empfiehlst Bücher anhand eines Leseprofils.
             Antworte AUSSCHLIESSLICH mit einem JSON-Objekt, ohne erklärenden Text:
@@ -117,8 +120,13 @@ object LlmPrompts {
             - maximal 8 reale, veröffentlichte Bücher.
             - "reason": ein kurzer Satz auf Deutsch, warum das Buch zum Profil passt.
             - Berücksichtige auch die unbeliebten Genres/Tropes/Autor:innen (Abbrüche, niedrige Bewertungen) und meide diese.
+            - Empfiehl KEINE Bücher, die bereits in der Liste der vorhandenen Titel stehen.
         """.trimIndent()
-        val user = "Mein Leseprofil:\n${profileText(profile)}"
+        val ownedBlock = if (ownedTitles.isNotEmpty()) {
+            "\n\nBereits in meiner Bibliothek (nicht erneut empfehlen):\n" +
+                ownedTitles.take(80).joinToString(", ")
+        } else ""
+        val user = "Mein Leseprofil:\n${profileText(profile)}$ownedBlock"
         return system to user
     }
 
@@ -168,6 +176,10 @@ object LlmPrompts {
                     put("title", book.title)
                     put("author", book.author)
                     put("genre", book.genre)
+                    if (book.seriesName.isNotBlank()) put("series", book.seriesName)
+                    if (book.seriesIndex != null) put("band", book.seriesIndex)
+                    if (book.universeName.isNotBlank()) put("universe", book.universeName)
+                    if (book.pageCount != null) put("pages", book.pageCount)
                     put("tropes", buildJsonArray {
                         book.tropes.forEach { add(it.name) }
                     })
@@ -203,6 +215,15 @@ object LlmPrompts {
             appendLine("Titel: ${book.title}")
             appendLine("Autor:in: ${book.author}")
             appendLine("Genre: ${book.genre.ifBlank { "unbekannt" }}")
+            if (book.seriesName.isNotBlank()) {
+                appendLine("Buchreihe: ${book.seriesName}${book.seriesIndex?.let { " (Band $it)" } ?: ""}")
+            }
+            if (book.universeName.isNotBlank()) {
+                appendLine("Buch-Universum: ${book.universeName}")
+            }
+            if (book.pageCount != null) {
+                appendLine("Seiten: ${book.pageCount}")
+            }
             appendLine("Tropes: ${book.tropes.joinToString { it.name }.ifBlank { "keine" }}")
             appendLine("Klappentext: ${book.description.ifBlank { "keiner vorhanden" }.take(2500)}")
             appendLine("Eigenes Rating: ${book.rating ?: "-"}/5, Status: ${book.status.label}")

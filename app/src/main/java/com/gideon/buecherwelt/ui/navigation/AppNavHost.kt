@@ -137,7 +137,7 @@ fun AppNavHost(
                 DiscoverScreen(container = container, navController = navController)
             }
             composable(Screen.Stats.route) {
-                StatsScreen(container = container)
+                StatsScreen(container = container, navController = navController)
             }
             composable(Screen.Tropes.route) {
                 TropeManagerScreen(container = container, navController = navController)

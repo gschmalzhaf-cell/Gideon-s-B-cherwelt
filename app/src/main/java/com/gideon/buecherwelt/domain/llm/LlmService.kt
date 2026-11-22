@@ -61,9 +61,13 @@ class LlmService(
         return LlmResponseParser.parseBookCompletion(content)
     }
 
-    suspend fun recommendBooks(config: LlmConfig, profile: ReadingProfile): List<LlmBookRecommendation> {
+    suspend fun recommendBooks(
+        config: LlmConfig,
+        profile: ReadingProfile,
+        ownedTitles: List<String> = emptyList()
+    ): List<LlmBookRecommendation> {
         if (!config.isConfigured) return emptyList()
-        val (system, user) = LlmPrompts.bookRecommendations(profile)
+        val (system, user) = LlmPrompts.bookRecommendations(profile, ownedTitles)
         val content = client.complete(config, system, user) ?: return emptyList()
         return LlmResponseParser.parseBookRecommendations(content)
     }

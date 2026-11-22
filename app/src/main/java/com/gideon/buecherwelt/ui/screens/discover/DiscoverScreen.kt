@@ -156,22 +156,75 @@ fun DiscoverScreen(
                 }
             }
 
-            if (state.profile.subRecommendations.isNotEmpty()) {
+            // Reihen-Wächter: Direkte Fortsetzungen & fehlende Bände
+            val seriesAlerts = state.seriesProgress.filter {
+                (it.readCount > 0 && it.nextUnreadBook != null) || it.missingIndices.isNotEmpty()
+            }.take(4)
+            if (seriesAlerts.isNotEmpty()) {
                 item {
-                    SectionHeader("Dein SuB-Berater (Als Nächstes lesen)")
+                    SectionHeader("Reihen-Wächter (Weiterlesen & Lücken)")
                     Text(
-                        "Aus deinen geplanten Büchern im Regal – intelligent sortiert nach deinem Leseprofil:",
+                        "Deine aktiven Buchreihen – direkt bereite Folgebände und erkannte Lücken im Regal:",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-                items(state.profile.subRecommendations, key = { "sub_${it.first.id}" }) { (book, fit) ->
-                    SubRecommendationCard(
-                        book = book,
-                        fitScore = fit.first,
-                        fitReason = fit.second,
-                        onClick = { navController.navigate(Screen.BookDetail.create(book.id)) }
+                items(seriesAlerts, key = { "series_${it.seriesName}" }) { sp ->
+                    SeriesWatcherCard(
+                        progress = sp,
+                        onOpenBook = { bookId -> navController.navigate(Screen.BookDetail.create(bookId)) }
                     )
+                }
+            }
+
+            if (state.profile.subRecommendations.isNotEmpty() || state.moodSubRecommendations.isNotEmpty()) {
+                item {
+                    SectionHeader("Dein SuB-Berater (Als Nächstes lesen)")
+                    Text(
+                        "Wähle deine aktuelle Leselaune – dein SuB wird intelligent nach deinem Profil sortiert:",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(Modifier.height(6.dp))
+                    androidx.compose.foundation.lazy.LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        items(
+                            com.gideon.buecherwelt.domain.analysis.ReadingMood.entries,
+                            key = { it.name }
+                        ) { mood ->
+                            androidx.compose.material3.FilterChip(
+                                selected = state.selectedMood == mood,
+                                onClick = { viewModel.selectMood(mood) },
+                                label = {
+                                    Text(
+                                        "${mood.emoji} ${mood.label}",
+                                        style = MaterialTheme.typography.labelSmall
+                                    )
+                                },
+                                shape = CircleShape
+                            )
+                        }
+                    }
+                }
+                if (state.moodSubRecommendations.isEmpty()) {
+                    item {
+                        Text(
+                            "Kein ungelesenes Buch im Regal passt gerade zur Stimmung „${state.selectedMood.label}“ – probiere eine andere Leselaune.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(vertical = 4.dp)
+                        )
+                    }
+                } else {
+                    items(state.moodSubRecommendations, key = { "sub_${it.first.id}" }) { (book, fit) ->
+                        SubRecommendationCard(
+                            book = book,
+                            fitScore = fit.first,
+                            fitReason = fit.second,
+                            onClick = { navController.navigate(Screen.BookDetail.create(book.id)) }
+                        )
+                    }
                 }
             }
 
@@ -486,4 +539,86 @@ private fun WishlistCard(
         }
     }
 }
+
+@Composable
+private fun SeriesWatcherCard(
+    progress: com.gideon.buecherwelt.domain.analysis.SeriesProgress,
+    onOpenBook: (Long) -> Unit
+) {
+    val nextBook = progress.nextUnreadBook
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .then(
+                if (nextBook != null) Modifier.clickable { onOpenBook(nextBook.id) }
+                else Modifier
+            ),
+        shape = MaterialTheme.shapes.large,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+        border = BorderStroke(0.8.dp, MaterialTheme.colorScheme.outlineVariant)
+    ) {
+        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = progress.seriesName,
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontFamily = PlayfairDisplay,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    if (progress.author.isNotBlank()) {
+                        Text(
+                            text = progress.author,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+                Surface(
+                    color = MaterialTheme.colorScheme.secondaryContainer,
+                    shape = CircleShape
+                ) {
+                    Text(
+                        text = "${progress.readCount}/${progress.totalOwned} gelesen",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                    )
+                }
+            }
+            androidx.compose.material3.LinearProgressIndicator(
+                progress = { progress.progressFraction },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(6.dp)
+            )
+            if (nextBook != null) {
+                Text(
+                    text = "📖 Bereit zum Weiterlesen: ${nextBook.title}" +
+                        (nextBook.seriesIndex?.let { " (Band $it)" } ?: ""),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            if (progress.missingIndices.isNotEmpty()) {
+                val missingText = progress.missingIndices.joinToString(", ") { "Band $it" }
+                Text(
+                    text = "⚠️ Lücke im Regal erkannt: $missingText fehlt",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.error
+                )
+            }
+        }
+    }
+}
+
 

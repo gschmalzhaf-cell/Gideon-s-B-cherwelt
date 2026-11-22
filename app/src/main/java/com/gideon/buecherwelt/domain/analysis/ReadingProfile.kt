@@ -125,7 +125,7 @@ object ReadingStatsCalculator {
 
         val subRecs = books
             .filter { it.status == ReadingStatus.PLANNED }
-            .map { b -> b to computeLocalFit(b, baseProfile) }
+            .map { b -> b to computeLocalFit(b, baseProfile, books) }
             .sortedByDescending { it.second.first }
             .take(5)
 
@@ -178,9 +178,13 @@ object ReadingStatsCalculator {
 
     /**
      * Berechnet lokal (100 % offline) einen Profil-Passgenauigkeits-Score (0–100)
-     * samt deutscher Begründung anhand des Leseprofils.
+     * samt deutscher Begründung anhand des Leseprofils (inkl. Reihen-Kontinuität & Universum).
      */
-    fun computeLocalFit(book: Book, profile: ReadingProfile): Pair<Int, String> {
+    fun computeLocalFit(
+        book: Book,
+        profile: ReadingProfile,
+        allBooks: List<Book> = emptyList()
+    ): Pair<Int, String> {
         if (profile.totalBooks == 0) {
             return 75 to "Neues Werk für deine Bibliothek – sammle weitere Bücher für ein präzises Leseprofil."
         }
@@ -232,9 +236,48 @@ object ReadingStatsCalculator {
             dislikedHits += "eher gemiedene Tropes (${dislikedTropes.first()})"
         }
 
-        if (book.seriesName.isNotBlank() && profile.favorites.any { it.seriesName.equals(book.seriesName, ignoreCase = true) }) {
+        // Reihen-Kontinuität: direkter Folgeband einer gelesenen Reihe bekommt starken Boost
+        var seriesBoostApplied = false
+        if (book.seriesName.isNotBlank() && book.seriesIndex != null && allBooks.isNotEmpty()) {
+            val prevVol = allBooks.firstOrNull {
+                it.id != book.id &&
+                    it.seriesName.equals(book.seriesName, ignoreCase = true) &&
+                    it.seriesIndex == book.seriesIndex - 1 &&
+                    it.status == ReadingStatus.READ
+            }
+            if (prevVol != null) {
+                val prevRating = prevVol.rating ?: 4
+                if (prevRating >= 3) {
+                    score += if (prevRating >= 4) 18 else 10
+                    reasons += "Direkte Fortsetzung nach Band ${book.seriesIndex - 1} von „${book.seriesName}“"
+                    seriesBoostApplied = true
+                }
+            } else if (book.seriesIndex > 1 && book.status == ReadingStatus.PLANNED) {
+                val unreadPredecessor = allBooks.any {
+                    it.id != book.id &&
+                        it.seriesName.equals(book.seriesName, ignoreCase = true) &&
+                        (it.seriesIndex ?: Int.MAX_VALUE) < book.seriesIndex &&
+                        it.status == ReadingStatus.PLANNED
+                }
+                if (unreadPredecessor) {
+                    score -= 10
+                }
+            }
+        }
+
+        if (!seriesBoostApplied && book.seriesName.isNotBlank() &&
+            profile.favorites.any { it.seriesName.equals(book.seriesName, ignoreCase = true) }
+        ) {
             score += 12
             reasons += "Fortsetzung deiner Lieblingsreihe „${book.seriesName}“"
+        }
+
+        if (book.universeName.isNotBlank() &&
+            profile.favorites.any { it.universeName.equals(book.universeName, ignoreCase = true) } &&
+            reasons.none { it.contains(book.universeName, ignoreCase = true) }
+        ) {
+            score += 9
+            reasons += "Lieblings-Universum „${book.universeName}“"
         }
 
         if (profile.avgSpice != null && book.spiceLevel != null) {

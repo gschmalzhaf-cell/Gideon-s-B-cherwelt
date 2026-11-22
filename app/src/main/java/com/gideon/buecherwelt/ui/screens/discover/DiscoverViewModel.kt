@@ -27,6 +27,9 @@ data class DiscoverUiState(
     val llmCandidates: List<ScoredCandidate> = emptyList(),
     val wishlist: List<WishlistItem> = emptyList(),
     val profile: ReadingProfile = ReadingProfile(),
+    val selectedMood: com.gideon.buecherwelt.domain.analysis.ReadingMood = com.gideon.buecherwelt.domain.analysis.ReadingMood.ALL,
+    val moodSubRecommendations: List<Pair<com.gideon.buecherwelt.domain.model.Book, Pair<Int, String>>> = emptyList(),
+    val seriesProgress: List<com.gideon.buecherwelt.domain.analysis.SeriesProgress> = emptyList(),
     val ruleLoading: Boolean = false,
     val llmLoading: Boolean = false,
     val llmConfigured: Boolean = false,
@@ -49,6 +52,7 @@ class DiscoverViewModel(
     val state: StateFlow<DiscoverUiState> = _state.asStateFlow()
 
     private var llmConfig: LlmConfig = LlmConfig()
+    private var latestBooks: List<com.gideon.buecherwelt.domain.model.Book> = emptyList()
 
     init {
         viewModelScope.launch {
@@ -59,13 +63,39 @@ class DiscoverViewModel(
         }
         viewModelScope.launch {
             bookRepository.observeBooks().collect { books ->
-                _state.update { it.copy(profile = ReadingStatsCalculator.compute(books)) }
+                latestBooks = books
+                val profile = ReadingStatsCalculator.compute(books)
+                val series = com.gideon.buecherwelt.domain.analysis.SmartLibraryEngine.analyzeSeriesProgress(books)
+                _state.update { cur ->
+                    cur.copy(
+                        profile = profile,
+                        seriesProgress = series,
+                        moodSubRecommendations = com.gideon.buecherwelt.domain.analysis.SmartLibraryEngine.filterSubByMood(
+                            books = books,
+                            profile = profile,
+                            mood = cur.selectedMood
+                        )
+                    )
+                }
             }
         }
         viewModelScope.launch {
             wishlistRepository.observeAll().collect { items ->
                 _state.update { it.copy(wishlist = items) }
             }
+        }
+    }
+
+    fun selectMood(mood: com.gideon.buecherwelt.domain.analysis.ReadingMood) {
+        _state.update { cur ->
+            cur.copy(
+                selectedMood = mood,
+                moodSubRecommendations = com.gideon.buecherwelt.domain.analysis.SmartLibraryEngine.filterSubByMood(
+                    books = latestBooks,
+                    profile = cur.profile,
+                    mood = mood
+                )
+            )
         }
     }
 
@@ -110,8 +140,10 @@ class DiscoverViewModel(
         }
         viewModelScope.launch {
             _state.update { it.copy(llmLoading = true, error = null) }
-            val profile = ReadingStatsCalculator.compute(bookRepository.getAllBooks())
-            val recs = llmService.recommendBooks(llmConfig, profile)
+            val all = bookRepository.getAllBooks()
+            val profile = ReadingStatsCalculator.compute(all)
+            val ownedTitles = all.map { it.title }.filter { it.isNotBlank() }
+            val recs = llmService.recommendBooks(llmConfig, profile, ownedTitles)
             if (recs.isEmpty()) {
                 _state.update {
                     it.copy(

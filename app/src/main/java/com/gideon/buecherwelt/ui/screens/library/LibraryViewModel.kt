@@ -219,36 +219,52 @@ class LibraryViewModel(
 
     fun dismissEnrichMessage() = _state.update { it.copy(enrichMessage = null) }
 
-    fun runSemanticSearch() {
+    fun runQuickSmartPreset(presetQuery: String) {
+        _state.update { it.copy(semanticQuery = presetQuery) }
+        runSemanticSearch(preferLocal = true)
+    }
+
+    fun runSemanticSearch(preferLocal: Boolean = false) {
         val query = state.value.semanticQuery.trim()
         if (query.isEmpty()) return
-        if (!llmConfig.isConfigured) {
-            _state.update {
-                it.copy(semanticError = "Kein LLM-API-Key konfiguriert (Einstellungen).")
-            }
-            return
-        }
         viewModelScope.launch {
             _state.update {
                 it.copy(semanticLoading = true, semanticError = null, semanticActive = false)
             }
             val books = bookRepository.getAllBooks()
-            val result = llmService.semanticSearch(llmConfig, query, books)
-            _state.update {
-                if (result == null) {
-                    it.copy(
-                        semanticLoading = false,
-                        semanticError = "KI-Suche fehlgeschlagen (offline oder API-Fehler)."
-                    )
-                } else {
-                    it.copy(
-                        semanticLoading = false,
-                        semanticActive = true,
-                        semanticIds = result.ids.toSet(),
-                        semanticExplanation = result.explanation.ifBlank { null },
-                        semanticError = null
-                    )
+            val profile = state.value.profile
+
+            if (!preferLocal && llmConfig.isConfigured) {
+                val llmResult = llmService.semanticSearch(llmConfig, query, books)
+                if (llmResult != null) {
+                    _state.update {
+                        it.copy(
+                            semanticLoading = false,
+                            semanticActive = true,
+                            semanticIds = llmResult.ids.toSet(),
+                            semanticExplanation = llmResult.explanation.ifBlank { null },
+                            semanticError = null
+                        )
+                    }
+                    return@launch
                 }
+            }
+
+            // 100 % Offline Smart-Suche (direkt oder als automatischer Fallback)
+            val local = com.gideon.buecherwelt.domain.analysis.SmartLibraryEngine.localSmartSearch(
+                query = query,
+                books = books,
+                profile = profile
+            )
+            val prefix = if (!preferLocal && llmConfig.isConfigured) "Lokal (Offline-Fallback): " else ""
+            _state.update {
+                it.copy(
+                    semanticLoading = false,
+                    semanticActive = true,
+                    semanticIds = local.bookIds.toSet(),
+                    semanticExplanation = prefix + local.explanation,
+                    semanticError = null
+                )
             }
         }
     }

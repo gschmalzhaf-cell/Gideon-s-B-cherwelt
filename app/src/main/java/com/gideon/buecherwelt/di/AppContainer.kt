@@ -39,7 +39,7 @@ class AppContainer(context: Context) {
             val request = chain.request()
             val apiKey = BuildConfig.GOOGLE_BOOKS_API_KEY
             val builder = request.newBuilder()
-                .header("User-Agent", "GideonsBuecherwelt/1.5 (Android)")
+                .header("User-Agent", "GideonsBuecherwelt/1.7 (Android)")
             val newRequest = if (apiKey.isNotBlank() && request.url.host == "www.googleapis.com") {
                 builder
                     .url(request.url.newBuilder().addQueryParameter("key", apiKey).build())

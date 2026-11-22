@@ -234,7 +234,7 @@ fun LibraryScreen(
                     }
                 }
             }
-            if (state.llmConfigured) {
+            if (state.books.isNotEmpty()) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
@@ -244,12 +244,20 @@ fun LibraryScreen(
                     AppTextField(
                         value = state.semanticQuery,
                         onValueChange = viewModel::setSemanticQuery,
-                        placeholder = { Text("KI-Suche, z. B. „düstere Bücher mit Happy End“") },
+                        placeholder = {
+                            Text(
+                                if (state.llmConfigured) {
+                                    "Smart- & KI-Suche, z. B. „düster & ungelesen“"
+                                } else {
+                                    "Smart-Suche, z. B. „ungelesen & spicy“ oder „kurz“"
+                                }
+                            )
+                        },
                         leadingIcon = { Icon(Icons.Default.AutoAwesome, contentDescription = null) },
-                        trailingIcon = if (state.semanticActive) {
+                        trailingIcon = if (state.semanticActive || state.semanticQuery.isNotBlank()) {
                             {
                                 IconButton(onClick = viewModel::clearSemantic) {
-                                    Icon(Icons.Default.Close, contentDescription = "KI-Suche zurücksetzen")
+                                    Icon(Icons.Default.Close, contentDescription = "Smart-Suche zurücksetzen")
                                 }
                             }
                         } else null,
@@ -258,14 +266,39 @@ fun LibraryScreen(
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     IconButton(
-                        onClick = viewModel::runSemanticSearch,
+                        onClick = { viewModel.runSemanticSearch() },
                         enabled = !state.semanticLoading && state.semanticQuery.isNotBlank()
                     ) {
                         if (state.semanticLoading) {
                             CircularProgressIndicator(modifier = Modifier.size(20.dp))
                         } else {
-                            Icon(Icons.Default.AutoAwesome, contentDescription = "KI-Suche starten")
+                            Icon(Icons.Default.AutoAwesome, contentDescription = "Smart-Suche starten")
                         }
+                    }
+                }
+                val smartPresets = listOf(
+                    "✨ Highlight" to "ungelesen nächstes highlight",
+                    "🌙 Düster" to "düster",
+                    "🔥 Spicy" to "spicy",
+                    "☕ Cozy & Kurz" to "warmherzig kurz",
+                    "🐉 Magisch" to "magisch",
+                    "⭐ Favoriten" to "favoriten"
+                )
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    modifier = Modifier.padding(top = 6.dp)
+                ) {
+                    items(smartPresets, key = { it.first }) { (label, presetQuery) ->
+                        val active = state.semanticActive && state.semanticQuery.equals(presetQuery, ignoreCase = true)
+                        androidx.compose.material3.FilterChip(
+                            selected = active,
+                            onClick = {
+                                if (active) viewModel.clearSemantic()
+                                else viewModel.runQuickSmartPreset(presetQuery)
+                            },
+                            label = { Text(label, style = MaterialTheme.typography.labelSmall) },
+                            shape = CircleShape
+                        )
                     }
                 }
                 if (state.semanticActive && state.semanticExplanation != null) {

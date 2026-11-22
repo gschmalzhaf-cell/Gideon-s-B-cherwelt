@@ -1,109 +1,150 @@
-# Gideon's Bücherwelt
+# 📚 Gideon's Bücherwelt
 
-Android-App (Kotlin + Jetpack Compose, MVVM) zum Verwalten einer persönlichen Bibliothek und
-zum Entdecken neuer Bücher. **100 % lokal** (Room-Datenbank, DataStore), offline-fähig;
-Netzwerk wird nur für ISBN-Abfragen (Google Books + Open Library), Cover-Downloads und
-optionale LLM-Aufrufe (z. B. Mistral) genutzt.
+**Deine intelligente, 100 % lokale Android-Bibliothek** – zum Verwalten deiner persönlichen Büchersammlung, Erkennen von Buchreihen & Universen, Analysieren deiner Lese-DNA und Entdecken neuer Lieblingsbücher.
 
-## Tech-Stack
+- **Privacy First & Offline-fähig**: Alle Daten liegen lokal auf deinem Gerät (Room/SQLite & DataStore). Es gibt keinen Account-Zwang und keine Cloud-Pflicht.
+- **Netzwerk nur bei Bedarf**: Ausschließlich für Buchdaten-/Cover-Abfragen (ISBN, ASIN, Amazon-Kurzlinks, Titel-Suche) sowie optionale KI-/LLM-Aufrufe mit deinem eigenen API-Key (z. B. Mistral, OpenAI-kompatible Endpunkte).
 
-- Kotlin 2.0, Jetpack Compose (Material 3), Navigation-Compose, MVVM
-- Room (SQLite) – Bücher, Tropes, Buch↔Trope, Merkliste
-- DataStore (Einstellungen: Theme, LLM-Key/-URL/-Modell)
-- Retrofit + OkHttp + kotlinx.serialization – Google Books API, Open Library API
-- ML Kit Barcode-Scanning + CameraX – ISBN-Scan per Kamera
-- Coil – Cover-Anzeige; Cover werden zusätzlich lokal in `filesDir/covers` gecacht (offline)
-- LLM-Client (OpenAI-kompatibles `/chat/completions`, konfigurierbare Basis-URL)
+---
 
-## Funktionen
+## ✨ Funktionen
 
-1. **Bücher erfassen** – ISBN per Kamera-Scan (EAN/ISBN) oder manuell; Buchdaten werden
-   automatisch geladen (Google Books, Open Library als Fallback für fehlende Felder);
-   manuelle Nachbearbeitung aller Felder; komplett manuelle Erfassung ohne ISBN möglich.
-   Duplikate (ISBN oder Titel+Autor) werden erkannt und können zusammengeführt werden.
-2. **Metadaten & Tags** – editierbarer Tropes-Katalog (Autovervollständigung, Mehrfachauswahl,
-   eigene Tropes), Bewertung 1–5, Lesestatus (geplant/lesend/gelesen/abgebrochen),
-   Spice-Level 0–5, Genre/Subgenre, Notizen, **Serie/Reihe + Band-Nr.** (mit Vorschlägen
-   bestehender Serien). **LLM-Trope-Vorschläge** als anklickbare Chips
-   (nur nach Bestätigung übernommen). **StoryGraph-CSV-Import** (Titel, Autor:in, Status,
-   Tags; Buchdaten per ISBN nachladen). Beim Bearbeiten kann das **Cover direkt ersetzt** werden
-   („Cover ändern“ per Galerie). Auf der **Buchdetailseite** zeigt ein eigener Serie-Abschnitt
-   alle weiteren Bände (klickbar) plus die kombinierten Genres/Tropes der ganzen Serie –
-   direkt vor Ort verknüpfbar/änderbar.
-6. **App-Report** (Einstellungen → Über): lokaler Report als Markdown + JSON (App-/Geräteinfos,
-   DB-Version, Qualitätsstatistiken, Leseprofil, Buchliste; **API-Key wird redacted**) zum
-   Kopieren/Teilen – nichts wird an einen Server gesendet.
-3. **Statistik** – Dashboard mit Top-Genres, Top-Tropes, Lieblingsautor:innen/-verlagen,
-   Ø Spice-Level, Ø Bewertung, Genre-Verteilung, Status-Übersicht, Lieblingsbüchern **und
-   „Weniger beliebt"** (Abbrüche + 1-2-Sterne-Bewertungen als negative Signale). Wird
-   automatisch aus den erfassten Büchern abgeleitet (gelesene + hoch bewertete Bücher zählen stärker).
-4. **Entdecken** – regelbasierte Empfehlungen (gleiche Tropes/Genre/Autor:in/Verlag, diversifiziert,
-   negative Signale abgewertet) und optionale LLM-Empfehlungen mit Begründung; bei konfiguriertem
-   LLM-Key zusätzlich **KI-Re-Ranking** der regelbasierten Kandidaten mit Begründung pro Buch;
-   „Ähnliche Bücher" pro Buch; Merkliste; per Klick (ISBN) zur Sammlung hinzufügen.
-5. **KI-Features** (optional, LLM-Key in den Einstellungen) – **semantische Suche** in der
-   Bibliothek per Freitext (z. B. „düstere Bücher mit Happy End") und **KI-Einblicke** in der
-   Buchdetailansicht (spoilerfreie Zusammenfassung + „Passt zu deinem Profil"-Score 0-100,
-   lokal in der Datenbank gecacht).
+### 1. Schnelles Erfassen & automatische Anreicherung
+- **ISBN-/Barcode-Scan** per Kamera (ML Kit + CameraX) oder manuelle Eingabe von **ISBN, ASIN & Amazon-Kurzlinks** (`amzn.eu`, `amzn.to`, `a.co` inkl. automatischer Weiterleitungs-Auflösung).
+- **Cover-Scanner (OCR + KI)**: Buchcover fotografieren und automatisch erkennen lassen.
+- **Multi-Quellen-Suche**: Kombiniert Google Books, Open Library, Audnex, Apple Books, Goodreads und öffentliche Produktseiten-Metadaten – ideal auch für deutsche Indie-, Dark-Romance- und Kindle-Unlimited-Titel.
+- **Duplikat-Erkennung**: Erkennt doppelte Bücher (ISBN oder Titel + Autor:in) und bietet intelligentes Zusammenführen an.
+- **StoryGraph-CSV-Import**: Bestehende Leselisten importieren und fehlende Metadaten/Cover automatisch nachladen.
+- **Hintergrund-Anreicherung**: Ergänzt beim Start oder per Klick fehlende Cover, Klappentexte, Seitenzahlen, Buchreihen, Universen und Tropes.
 
-## Projektstruktur
+### 2. Bibliotheks-Intelligenz (100 % offline + optionales LLM)
+- **Smart-Suche & Stimmungs-Chips**: Versteht natürliche Anfragen wie *„ungelesen & düster“*, *„kurz & romantisch“*, *„ohne spice“* oder *„nächstes highlight“* komplett offline – mit optionaler LLM-Erweiterung und automatischem Offline-Fallback.
+- **Reihen- & Universums-Erkennung**: Erkennt automatisch Buchreihen, Bandnummern und übergeordnete Buch-Universen (z. B. *Maasverse*, *Grishaverse*, *Empyrean-Universum*, *Cosmere*, *Schattenjäger-Universum*).
+- **Reihen-Wächter & Lücken-Check**: Zeigt lesebereite Folgebände in deinem Regal und warnt bei fehlenden Bandnummern innerhalb einer Reihe.
+- **Lokale Buch-Analyse**: Leitet aus Klappentext & Metadaten automatisch Stimmungen, Erzähltempo (Pacing), Schauplätze, geschätzte Lesezeit, Tropes und Spice-Level ab.
+- **Offline „Ähnliche Bücher im eigenen Regal“**: Findet sofort passende Titel aus deiner Sammlung mit Match-Prozentwert und Begründung.
 
-```
+### 3. Metadaten, Tropes & Buchdetailseite
+- **Editierbarer Tropes-Katalog**: Über 70 kuratierte Tropes nach Kategorien (Romance, Fantasy, Sci-Fi, Krimi/Thriller, Allgemein), Autovervollständigung, eigene Tropes und 1-Klick-Übernahme erkannter Vorschläge.
+- **Bewertung & Status**: 1–5 Sterne, Spice-Level 0–5, Lesestatus (*Geplant / Lesend / Gelesen / Abgebrochen*), persönliche Notizen und direktes Cover-Ersetzen (Online-Auswahl oder eigene Galerie).
+- **Lesepult**: Hebt aktuell gelesene Bücher direkt oben in der Bibliothek hervor.
+- **Serien- & Universums-Verknüpfung**: Klickbare Übersicht aller Bände einer Reihe und verbundener Reihen desselben Universums direkt auf der Buchdetailseite.
+
+### 4. Entdecken, SuB-Berater & Merkliste
+- **Stimmungsbasierter SuB-Berater**: Sortiert deine ungelesenen Bücher nach Profil-Passgenauigkeit (inkl. direktem Folgeband-Boost) und filtert nach aktueller Leselaune (*Alle*, *Fortsetzung*, *Düster*, *Romantisch*, *Magisch*, *Spannend*, *Wohlfühl*, *Kurz*).
+- **Regelbasierte & KI-Empfehlungen**: Analysiert Genres, Autor:innen, Tropes, Klappentexte und negative Signale (Abbrüche, 1–2 ★). Mit LLM-Key zusätzlich **KI-Re-Ranking** und kuratierte Vorschläge ohne Duplikate aus deinem Regal.
+- **Merkliste**: Spannende Funde merken und per Klick in die Bibliothek übernehmen.
+
+### 5. Lese-Chronik, Exlibris & Lese-DNA
+- **Lese-Archetyp (Exlibris)**: Automatisch abgeleitete Lese-Persönlichkeit samt Badge.
+- **Lese-DNA & Zeit-Prognose**: Geschätzte gelesene Seiten & Lesestunden, SuB-Lesezeit, durchschnittliche Buchlänge und Top-Stimmungen.
+- **Reihen-Fortschritt & Dashboards**: Fortschrittsbalken pro Reihe, Genre-Verteilung, Top-Tropes, Lieblingsautor:innen/-verlage, Ø Bewertung, Ø Spice, „Weniger beliebt“-Signale und klickbares Ehrenregal (4–5 ★).
+
+### 6. Diagnose & Datenschutz
+- **App-Report** (*Einstellungen → Über*): Erzeugt lokal einen Markdown- & JSON-Bericht (Geräte-/DB-Infos, Qualitätsstatistiken, Leseprofil) zum Teilen bei Fehlersuche – **API-Keys werden automatisch geschwärzt (redacted)**.
+
+---
+
+## 🛠️ Tech-Stack
+
+| Bereich | Technologien |
+|---|---|
+| **Sprache & UI** | Kotlin 2.4, Jetpack Compose (Material 3, Compose BOM 2026), Navigation-Compose, MVVM |
+| **Persistenz** | Room (SQLite, Schema v4 mit Migrationen 1→4), Jetpack DataStore (Theme & LLM-Config) |
+| **Netzwerk & Bilder** | Retrofit 3, OkHttp 5, kotlinx.serialization, Coil 3 (+ lokaler Offline-Cover-Cache in `filesDir/covers`) |
+| **Kamera & On-Device ML** | CameraX, Google ML Kit (Barcode-Scanning & Text-Recognition) |
+| **KI (optional)** | OpenAI-kompatibler `/chat/completions`-Client mit konfigurierbarer Basis-URL & Modellwahl |
+| **Design** | Warmes Bibliotheks-Theme (Light & Dark), Playfair Display + Plus Jakarta Sans, Google-Stitch-Designsystem (`design/`) |
+
+---
+
+## 📂 Projektstruktur
+
+```text
 app/src/main/java/com/gideon/buecherwelt/
-  di/AppContainer.kt            manuelles DI
-  data/local/                   Room (Entities, DAOs, AppDatabase), TropesCatalog
-  data/settings/                DataStore SettingsRepository (Theme, LLM)
-  data/network/                 GoogleBooksApi, OpenLibraryApi, BookMetadataFetcher, CoverCache
-  data/csv/                     StoryGraphCsvImporter
-  domain/                       Modelle, Repositories, Analyse, Empfehlungen, LLM, UseCases
-  ui/                           Theme, Navigation, Komponenten, Screens (library, add, scanner,
-                                detail, discover, stats, settings, tropes, import)
-design/DESIGN.md                verbindliche Design-Spezifikation (Farben, Typo, Komponenten)
-design/mockups/*.html           6 Bildschirm-Mockups (Pixso-importierbar, 412x915)
+├── di/AppContainer.kt              # Manuelles Dependency Injection
+├── data/
+│   ├── local/                      # Room (AppDatabase, Entities, DAOs), TropesCatalog
+│   ├── settings/                   # DataStore SettingsRepository (Theme, LLM)
+│   ├── network/                    # BookMetadataFetcher (ISBN/ASIN/URLs), APIs, CoverCache
+│   └── csv/                        # StoryGraphCsvImporter
+├── domain/
+│   ├── analysis/                   # ReadingProfile, SeriesUniverseDetector, SmartLibraryEngine
+│   ├── llm/                        # LlmClient, LlmService, LlmPrompts, CoverIdentifier
+│   ├── model/                      # Domain-Modelle (Book, Trope, WishlistItem)
+│   ├── recommendation/             # RecommendationEngine (Profil- & Ähnlichkeits-Scoring)
+│   ├── report/                     # AppReportGenerator (Markdown + JSON, redacted)
+│   ├── repository/                 # BookRepository, TropeRepository, WishlistRepository
+│   └── usecase/                    # AddToLibraryUseCase, BookEnrichmentService
+└── ui/
+    ├── theme/                      # Color, Type, Shape, Theme
+    ├── navigation/                 # AppNavHost & Routen
+    ├── components/                 # BookCard, BookCover, FilterBar, TropePicker, StarRating
+    └── screens/                    # library, detail, add, discover, stats, settings, tropes, import, scanner
+design/                             # Verbindliche Design-Tokens (DESIGN.md) & Mockups
 ```
 
-## Build & Start
+---
 
-Voraussetzung: Android Studio (neueste Version) mit Android SDK 35, JDK 17.
+## 🚀 Build & Release
 
+### Voraussetzungen
+- Android Studio (aktuell) mit **Android SDK 37**, **JDK 17** und **Gradle 9.9.1**.
+
+### Lokal bauen
 ```bash
-# Gradle-Wrapper erzeugen (einmalig, falls gradle-wrapper.jar fehlt):
-gradle wrapper            # oder in Android Studio: Rechtsklick gradle-wrapper.properties
+# Gradle-Wrapper erzeugen (falls noch nicht vorhanden):
+gradle wrapper --gradle-version 9.9.1 --distribution-type bin
 
-./gradlew assembleDebug
+# Debug-APK bauen:
+./gradlew :app:assembleDebug
 ```
+Die fertige APK liegt unter `app/build/outputs/apk/debug/app-debug.apk`.  
+Berechtigungen: **Kamera** (nur für ISBN-/Cover-Scan) und **Internet** (nur für Buchdaten, Cover & optionales LLM).
 
-App auf dem Smartphone installieren (`app-debug.apk`) und starten.
-Berechtigungen: Kamera (nur für den ISBN-Scan), Internet (nur für API-Abfragen).
+### CI/CD & Signiertes Release
+- **CI (`.github/workflows/build.yml`)**: Baut bei jedem Push/PR auf `main` eine Debug-APK.
+- **Release (`.github/workflows/release.yml`)**: Baut bei jedem Git-Tag `v*` signierte `app-release.apk` + `app-release.aab` und veröffentlicht ein GitHub-Release mit dem Inhalt aus [RELEASE_NOTES.md](RELEASE_NOTES.md). Details zur Keystore-Einrichtung siehe [RELEASE.md](RELEASE.md).
 
-## Release
+---
 
-Siehe [RELEASE.md](RELEASE.md): Keystore lokal erzeugen, 4 GitHub-Secrets setzen
-(`KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD`), dann `git tag v1.0.0 && git push origin v1.0.0` –
-der Workflow `.github/workflows/release.yml` baut signierte APK + AAB und legt ein GitHub-Release an.
-Bei jedem Push/PR baut `.github/workflows/build.yml` eine Debug-APK (CI-Compile-Check).
+## 🗺️ Roadmap & Optimierungsvorschläge
 
-## Design (Google Stitch)
+Nachfolgend konkrete Ideen für zukünftige Releases, priorisiert nach Nutzen für Leser:innen und technischer Qualität:
 
-Die GUI ist im Google-Stitch-Projekt **„Gideon's Bücherwelt – Android App (Bibliothek, Tropes,
-Empfehlungen)"** (`projects/2017226052745578868`) entworfen – inkl. Design-System
-(`assets/3041670234388923945`, warmes Bibliotheks-Theme mit Light+Dark) und allen sechs
-Hauptbildschirmen (Bibliothek, Buchdetail, Buch erfassen/Scan, Entdecken, Statistiken,
-Einstellungen; Screen-IDs siehe [design/stitch/SCREENS.md](design/stitch/SCREENS.md)).
-Die verbindliche Token-Spezifikation liegt in [design/DESIGN.md](design/DESIGN.md), statische
-Referenz-Mockups in [design/mockups/](design/mockups/). Die Compose-Umsetzung implementiert
-dieselben Tokens (Farben siehe `ui/theme/Color.kt`, Komponenten siehe `ui/components/`).
+### 🎯 Hoher Nutzwert (Features)
+1. **Lese-Fortschritt & Lese-Sessions (Seitenzähler / % + Leseziele)**
+   - Aktuelle Seite oder Prozentstand für Bücher auf dem *Lesepult* speichern, inkl. Jahres-Leseziel (*„18 / 30 Bücher in 2026“*) und monatlicher Lese-Timeline in der Statistik.
+2. **Lokales Backup & Restore (JSON / ZIP inkl. Cover)**
+   - Ein-Klick-Export der gesamten Bibliothek (Bücher, Tropes, Notizen, Bewertungen, Merkliste) als `.json` oder `.zip` zum Gerätewechsel – und kompatibler Import für Goodreads-CSVs zusätzlich zu StoryGraph.
+3. **Verleih- & Besitz-Tracker (Print / E-Book / Hörbuch / Verliehen)**
+   - Format-Badge (Hardcover, Taschenbuch, Kindle, Hörbuch), Regal-Standort sowie „Verliehen an … seit …“ inkl. Erinnerung.
+4. **Zitat- & Highlight-Sammlung pro Buch**
+   - Lieblingszitate (optional per Kamera-Texterkennung mit dem bereits vorhandenen ML Kit Text Recognition!) direkt am Buch speichern und teilen.
+5. **Reihen-Lücken per 1-Klick auf die Merkliste / Suchen**
+   - Im *Reihen-Wächter* direkt auf einen fehlenden Band (z. B. *„Band 2 fehlt“*) tippen, um automatisch die Titel-Suche vorzubefüllen oder ihn auf die Merkliste zu setzen.
+6. **Smart-Regale / Dynamische Sammlungen**
+   - Eigene benannte Regale oder gespeicherte Smart-Suche-Filter (z. B. *„Herbst-Vibes“*, *„Urlaubs-SuB unter 350 Seiten“*, *„5-Sterne-Highlights“*).
 
-## Entwicklungs-Schritte (jeweils lauffähige Version, eigene Commits)
+### ⚡ Technische & UX-Optimierungen
+1. **Automatisierte Unit- & Instrumentation-Tests**
+   - JUnit-Testsuite für `SmartLibraryEngine`, `SeriesUniverseDetector`, `ReadingStatsCalculator`, `BookMetadataFetcher` (Parser) und Room-Migrationen (1→4) in `.github/workflows/build.yml` integrieren.
+2. **Performance-Caching für Buch-Charakteristiken**
+   - `analyzeBookCharacteristics` und `computeLocalFit` für große Bibliotheken (> 300 Bücher) memoizen bzw. auf `Dispatchers.Default` berechnen, damit Filter- und Such-Interaktionen dauerhaft mit 60/120 fps laufen.
+3. **Android Share-Target („Teilen an Gideon's Bücherwelt“)**
+   - Amazon-, Thalia-, Goodreads- oder StoryGraph-Links direkt aus dem Browser oder der Amazon-App per Android-Teilen-Menü an die App senden und sofort im *Buch hinzufügen*-Screen öffnen.
+4. **Home-Screen-Widget (Glance)**
+   - Kompaktes Android-Widget für das *aktuelle Lesepult* oder den *SuB-Tipp des Tages*.
+5. **R8 / Code-Shrinking für Release-Builds**
+   - `isMinifyEnabled = true` & `isShrinkResources = true` mit sauber getesteten ProGuard-Regeln für `kotlinx.serialization`, Room und Retrofit aktivieren, um die APK-Größe deutlich zu reduzieren.
+6. **Barrierefreiheit & Tablet-/Foldable-Layout**
+   - Adaptive Master-Detail-Ansicht (Bibliothek + Buchdetail nebeneinander) auf großen Displays sowie durchgängige `contentDescription`- und TalkBack-Optimierungen.
 
-1. Grundgerüst + Erfassung (Scan/ISBN/manuell) + Bibliothek-Grid + Dark Mode
-2. Tropes/Tags + LLM-Vorschläge + StoryGraph-CSV-Import + Tropes-Verwaltung
-3. Statistik-Dashboard (Lesevorlieben-Analyse)
-4. Entdecken (regelbasiert + LLM + Merkliste + ähnliche Bücher)
+---
 
-## Fehlerbehandlung
+## 🛡️ Fehlerbehandlung & Offline-Verhalten
 
-- Keine Netzwerkverbindung → Hinweis, manuelle Erfassung weiterhin möglich, alles andere offline nutzbar.
-- ISBN nicht gefunden → Meldung, manuelle Erfassung möglich.
-- Duplikate → Dialog „bereits vorhanden – zusammenführen?" (leere Felder ergänzen, Tropes vereinen).
-- LLM nicht konfiguriert/offline → nur manueller Tropes-Katalog bzw. nur regelbasierte Empfehlungen.
+- **Keine Netzwerkverbindung**: Bibliothek, Smart-Suche, Reihen-Wächter, Lese-DNA, Ähnliche Bücher im Regal, SuB-Berater und manuelle Erfassung funktionieren vollständig offline.
+- **ISBN/ASIN nicht gefunden**: Klarer Hinweis mit direkter Möglichkeit zur Titel-Suche, KI-Vervollständigung oder manuellen Erfassung.
+- **Duplikate**: Zusammenführen-Dialog ergänzt leere Felder und vereint Tropes ohne Datenverlust.
+- **LLM nicht konfiguriert oder offline**: Alle Kern- und Intelligenz-Features bleiben nutzbar; die Smart-Suche schaltet automatisch auf die lokale Offline-Intelligenz um.
