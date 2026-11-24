@@ -1,3 +1,10 @@
+## Gideon's Bücherwelt v1.7.2 – Bibliothek: Suchfelder scrollen mit dem Regal
+
+### ✨ Verbesserung
+- **Suchfelder mitscrollen lassen**: Auf dem Reiter *Bibliothek* werden die beiden Suchfelder oben (Titel/Autor:in/ISBN-Suche und Smart- & KI-Suche inklusive Filter-Chips, Smart-Presets und Fortschrittsanzeige) nicht mehr fest am oberen Rand gehalten. Beim Hochscrollen der Bücher schieben sie sich jetzt gemeinsam mit dem Bücherregal nach oben – so bleibt mehr Platz für die Bücher im Blick.
+
+---
+
 ## Gideon's Bücherwelt v1.7.1 – Zuverlässiger ISBN-Scan & ISBN-Suche (Bugfix-Release)
 
 ### 🔧 Behobene Ursachen bei ISBN-Scan & manueller ISBN-Eingabe
