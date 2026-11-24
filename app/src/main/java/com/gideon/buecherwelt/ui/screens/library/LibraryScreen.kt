@@ -157,228 +157,228 @@ fun LibraryScreen(
             }
         }
     ) { padding ->
-        Column(
+        val filtered = state.filtered
+        val readingBooks = state.readingBooks
+        val showReadingShowcase = readingBooks.isNotEmpty() &&
+            state.query.isBlank() &&
+            state.status == null &&
+            !state.semanticActive
+
+        LazyVerticalGrid(
+            columns = GridCells.Adaptive(minSize = 110.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+            contentPadding = PaddingValues(top = 8.dp, bottom = 84.dp),
             modifier = Modifier
                 .padding(padding)
                 .padding(horizontal = 16.dp)
                 .fillMaxSize()
         ) {
-            FilterBar(
-                query = state.query,
-                onQueryChange = viewModel::setQuery,
-                genres = state.genres,
-                selectedGenre = state.genre,
-                onGenreChange = viewModel::setGenre,
-                selectedStatus = state.status,
-                onStatusChange = viewModel::setStatus,
-                minRating = state.minRating,
-                onMinRatingChange = viewModel::setMinRating,
-                tropes = state.tropes,
-                selectedTrope = state.trope,
-                onTropeChange = viewModel::setTrope,
-                seriesNames = state.seriesNames,
-                selectedSeries = state.series,
-                onSeriesChange = viewModel::setSeries,
-                universeNames = state.universeNames,
-                selectedUniverse = state.universe,
-                onUniverseChange = viewModel::setUniverse,
-                sortOrder = state.sortOrder,
-                onSortOrderChange = viewModel::setSortOrder,
-                modifier = Modifier.padding(top = 8.dp)
-            )
-            if (state.enriching || state.enrichMessage != null) {
-                Surface(
-                    shape = MaterialTheme.shapes.medium,
-                    color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.65f),
-                    modifier = Modifier
-                        .padding(top = 8.dp)
-                        .fillMaxWidth()
-                ) {
-                    Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            modifier = Modifier.fillMaxWidth()
+            item(span = { GridItemSpan(maxLineSpan) }) {
+                Column {
+                    FilterBar(
+                        query = state.query,
+                        onQueryChange = viewModel::setQuery,
+                        genres = state.genres,
+                        selectedGenre = state.genre,
+                        onGenreChange = viewModel::setGenre,
+                        selectedStatus = state.status,
+                        onStatusChange = viewModel::setStatus,
+                        minRating = state.minRating,
+                        onMinRatingChange = viewModel::setMinRating,
+                        tropes = state.tropes,
+                        selectedTrope = state.trope,
+                        onTropeChange = viewModel::setTrope,
+                        seriesNames = state.seriesNames,
+                        selectedSeries = state.series,
+                        onSeriesChange = viewModel::setSeries,
+                        universeNames = state.universeNames,
+                        selectedUniverse = state.universe,
+                        onUniverseChange = viewModel::setUniverse,
+                        sortOrder = state.sortOrder,
+                        onSortOrderChange = viewModel::setSortOrder
+                    )
+                    if (state.enriching || state.enrichMessage != null) {
+                        Surface(
+                            shape = MaterialTheme.shapes.medium,
+                            color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.65f),
+                            modifier = Modifier
+                                .padding(top = 8.dp)
+                                .fillMaxWidth()
                         ) {
-                            val progressText = state.enrichProgress?.let { (done, total) ->
-                                "Aktualisiere Bibliothek ($done/$total)…"
-                            } ?: state.enrichMessage.orEmpty()
-                            Text(
-                                text = progressText,
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onSecondaryContainer,
-                                modifier = Modifier.weight(1f)
-                            )
-                            if (!state.enriching) {
-                                IconButton(
-                                    onClick = viewModel::dismissEnrichMessage,
-                                    modifier = Modifier.size(22.dp)
+                            Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    modifier = Modifier.fillMaxWidth()
                                 ) {
-                                    Icon(
-                                        Icons.Default.Close,
-                                        contentDescription = "Schließen",
-                                        modifier = Modifier.size(16.dp)
+                                    val progressText = state.enrichProgress?.let { (done, total) ->
+                                        "Aktualisiere Bibliothek ($done/$total)…"
+                                    } ?: state.enrichMessage.orEmpty()
+                                    Text(
+                                        text = progressText,
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                    if (!state.enriching) {
+                                        IconButton(
+                                            onClick = viewModel::dismissEnrichMessage,
+                                            modifier = Modifier.size(22.dp)
+                                        ) {
+                                            Icon(
+                                                Icons.Default.Close,
+                                                contentDescription = "Schließen",
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                        }
+                                    }
+                                }
+                                val prog = state.enrichProgress
+                                if (state.enriching && prog != null && prog.second > 0) {
+                                    LinearProgressIndicator(
+                                        progress = { prog.first.toFloat() / prog.second.toFloat() },
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(top = 6.dp)
                                     )
                                 }
                             }
                         }
-                        val prog = state.enrichProgress
-                        if (state.enriching && prog != null && prog.second > 0) {
-                            LinearProgressIndicator(
-                                progress = { prog.first.toFloat() / prog.second.toFloat() },
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(top = 6.dp)
-                            )
-                        }
                     }
-                }
-            }
-            if (state.books.isNotEmpty()) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier
-                        .padding(top = 8.dp)
-                        .fillMaxWidth()
-                ) {
-                    AppTextField(
-                        value = state.semanticQuery,
-                        onValueChange = viewModel::setSemanticQuery,
-                        placeholder = {
-                            Text(
-                                if (state.llmConfigured) {
-                                    "Smart- & KI-Suche, z. B. „düster & ungelesen“"
-                                } else {
-                                    "Smart-Suche, z. B. „ungelesen & spicy“ oder „kurz“"
-                                }
+                    if (state.books.isNotEmpty()) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .padding(top = 8.dp)
+                                .fillMaxWidth()
+                        ) {
+                            AppTextField(
+                                value = state.semanticQuery,
+                                onValueChange = viewModel::setSemanticQuery,
+                                placeholder = {
+                                    Text(
+                                        if (state.llmConfigured) {
+                                            "Smart- & KI-Suche, z. B. „düster & ungelesen“"
+                                        } else {
+                                            "Smart-Suche, z. B. „ungelesen & spicy“ oder „kurz“"
+                                        }
+                                    )
+                                },
+                                leadingIcon = { Icon(Icons.Default.AutoAwesome, contentDescription = null) },
+                                trailingIcon = if (state.semanticActive || state.semanticQuery.isNotBlank()) {
+                                    {
+                                        IconButton(onClick = viewModel::clearSemantic) {
+                                            Icon(Icons.Default.Close, contentDescription = "Smart-Suche zurücksetzen")
+                                        }
+                                    }
+                                } else null,
+                                singleLine = true,
+                                modifier = Modifier.weight(1f)
                             )
-                        },
-                        leadingIcon = { Icon(Icons.Default.AutoAwesome, contentDescription = null) },
-                        trailingIcon = if (state.semanticActive || state.semanticQuery.isNotBlank()) {
-                            {
-                                IconButton(onClick = viewModel::clearSemantic) {
-                                    Icon(Icons.Default.Close, contentDescription = "Smart-Suche zurücksetzen")
+                            Spacer(modifier = Modifier.width(8.dp))
+                            IconButton(
+                                onClick = { viewModel.runSemanticSearch() },
+                                enabled = !state.semanticLoading && state.semanticQuery.isNotBlank()
+                            ) {
+                                if (state.semanticLoading) {
+                                    CircularProgressIndicator(modifier = Modifier.size(20.dp))
+                                } else {
+                                    Icon(Icons.Default.AutoAwesome, contentDescription = "Smart-Suche starten")
                                 }
                             }
-                        } else null,
-                        singleLine = true,
-                        modifier = Modifier.weight(1f)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    IconButton(
-                        onClick = { viewModel.runSemanticSearch() },
-                        enabled = !state.semanticLoading && state.semanticQuery.isNotBlank()
-                    ) {
-                        if (state.semanticLoading) {
-                            CircularProgressIndicator(modifier = Modifier.size(20.dp))
-                        } else {
-                            Icon(Icons.Default.AutoAwesome, contentDescription = "Smart-Suche starten")
+                        }
+                        val smartPresets = listOf(
+                            "✨ Highlight" to "ungelesen nächstes highlight",
+                            "🌙 Düster" to "düster",
+                            "🔥 Spicy" to "spicy",
+                            "☕ Cozy & Kurz" to "warmherzig kurz",
+                            "🐉 Magisch" to "magisch",
+                            "⭐ Favoriten" to "favoriten"
+                        )
+                        LazyRow(
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            modifier = Modifier.padding(top = 6.dp)
+                        ) {
+                            items(smartPresets, key = { it.first }) { (label, presetQuery) ->
+                                val active = state.semanticActive && state.semanticQuery.equals(presetQuery, ignoreCase = true)
+                                androidx.compose.material3.FilterChip(
+                                    selected = active,
+                                    onClick = {
+                                        if (active) viewModel.clearSemantic()
+                                        else viewModel.runQuickSmartPreset(presetQuery)
+                                    },
+                                    label = { Text(label, style = MaterialTheme.typography.labelSmall) },
+                                    shape = CircleShape
+                                )
+                            }
+                        }
+                        if (state.semanticActive && state.semanticExplanation != null) {
+                            Text(
+                                text = state.semanticExplanation!!,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.padding(top = 4.dp)
+                            )
+                        }
+                        if (state.semanticError != null) {
+                            Text(
+                                text = state.semanticError!!,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.padding(top = 4.dp)
+                            )
                         }
                     }
-                }
-                val smartPresets = listOf(
-                    "✨ Highlight" to "ungelesen nächstes highlight",
-                    "🌙 Düster" to "düster",
-                    "🔥 Spicy" to "spicy",
-                    "☕ Cozy & Kurz" to "warmherzig kurz",
-                    "🐉 Magisch" to "magisch",
-                    "⭐ Favoriten" to "favoriten"
-                )
-                LazyRow(
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    modifier = Modifier.padding(top = 6.dp)
-                ) {
-                    items(smartPresets, key = { it.first }) { (label, presetQuery) ->
-                        val active = state.semanticActive && state.semanticQuery.equals(presetQuery, ignoreCase = true)
-                        androidx.compose.material3.FilterChip(
-                            selected = active,
-                            onClick = {
-                                if (active) viewModel.clearSemantic()
-                                else viewModel.runQuickSmartPreset(presetQuery)
-                            },
-                            label = { Text(label, style = MaterialTheme.typography.labelSmall) },
-                            shape = CircleShape
-                        )
-                    }
-                }
-                if (state.semanticActive && state.semanticExplanation != null) {
-                    Text(
-                        text = state.semanticExplanation!!,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.padding(top = 4.dp)
-                    )
-                }
-                if (state.semanticError != null) {
-                    Text(
-                        text = state.semanticError!!,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.padding(top = 4.dp)
-                    )
                 }
             }
-            val filtered = state.filtered
-            val readingBooks = state.readingBooks
-            val showReadingShowcase = readingBooks.isNotEmpty() &&
-                state.query.isBlank() &&
-                state.status == null &&
-                !state.semanticActive
-
             if (filtered.isEmpty()) {
-                EmptyState(
-                    title = "Keine Bücher gefunden",
-                    subtitle = if (state.semanticActive) {
-                        "Die KI-Suche hat keine passenden Bücher gefunden – Frage oder Filter anpassen."
-                    } else if (state.books.isEmpty()) {
-                        "Deine Regale warten auf ihr erstes Werk. Füge Bücher per ISBN-Scan, Cover-Foto oder manuell über das + hinzu."
-                    } else {
-                        "Kein Buch entspricht den gewählten Filtern."
-                    },
-                    modifier = Modifier.fillMaxSize()
-                )
+                item(span = { GridItemSpan(maxLineSpan) }) {
+                    EmptyState(
+                        title = "Keine Bücher gefunden",
+                        subtitle = if (state.semanticActive) {
+                            "Die KI-Suche hat keine passenden Bücher gefunden – Frage oder Filter anpassen."
+                        } else if (state.books.isEmpty()) {
+                            "Deine Regale warten auf ihr erstes Werk. Füge Bücher per ISBN-Scan, Cover-Foto oder manuell über das + hinzu."
+                        } else {
+                            "Kein Buch entspricht den gewählten Filtern."
+                        }
+                    )
+                }
             } else {
-                LazyVerticalGrid(
-                    columns = GridCells.Adaptive(minSize = 110.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    verticalArrangement = Arrangement.spacedBy(14.dp),
-                    contentPadding = PaddingValues(top = 8.dp, bottom = 84.dp),
-                    modifier = Modifier.fillMaxSize()
-                ) {
-                    if (showReadingShowcase) {
-                        item(span = { GridItemSpan(maxLineSpan) }) {
-                            ReadingDeskShowcase(
-                                books = readingBooks,
-                                onBookClick = { navController.navigate(Screen.BookDetail.create(it.id)) }
-                            )
-                        }
-                    }
+                if (showReadingShowcase) {
                     item(span = { GridItemSpan(maxLineSpan) }) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = "Bücherregal (${filtered.size} von ${state.books.size})",
-                                style = MaterialTheme.typography.labelLarge,
-                                fontFamily = PlayfairDisplay,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Text(
-                                text = "Sortiert: ${state.sortOrder.label}",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-                    items(filtered, key = { it.id }) { book ->
-                        BookCard(
-                            book = book,
-                            onClick = { navController.navigate(Screen.BookDetail.create(book.id)) }
+                        ReadingDeskShowcase(
+                            books = readingBooks,
+                            onBookClick = { navController.navigate(Screen.BookDetail.create(it.id)) }
                         )
                     }
+                }
+                item(span = { GridItemSpan(maxLineSpan) }) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Bücherregal (${filtered.size} von ${state.books.size})",
+                            style = MaterialTheme.typography.labelLarge,
+                            fontFamily = PlayfairDisplay,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            text = "Sortiert: ${state.sortOrder.label}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+                items(filtered, key = { it.id }) { book ->
+                    BookCard(
+                        book = book,
+                        onClick = { navController.navigate(Screen.BookDetail.create(book.id)) }
+                    )
                 }
             }
         }
