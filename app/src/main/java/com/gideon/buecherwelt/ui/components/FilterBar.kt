@@ -14,6 +14,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.RestartAlt
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Sort
 import androidx.compose.material3.DropdownMenu
@@ -59,8 +60,17 @@ fun FilterBar(
     onUniverseChange: (String?) -> Unit = {},
     sortOrder: LibrarySortOrder = LibrarySortOrder.RECENT,
     onSortOrderChange: (LibrarySortOrder) -> Unit = {},
+    onResetAll: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
+    val hasActiveFilters = query.isNotEmpty() ||
+        selectedGenre != null ||
+        selectedStatus != null ||
+        minRating > 0 ||
+        selectedTrope != null ||
+        selectedSeries != null ||
+        selectedUniverse != null ||
+        sortOrder != LibrarySortOrder.RECENT
     Column(modifier = modifier) {
         TextField(
             value = query,
@@ -143,6 +153,30 @@ fun FilterBar(
                 onSelected = onTropeChange,
                 display = { it }
             )
+            if (onResetAll != null && hasActiveFilters) {
+                FilterChip(
+                    selected = true,
+                    onClick = onResetAll,
+                    shape = CircleShape,
+                    leadingIcon = {
+                        Icon(Icons.Default.RestartAlt, contentDescription = null, modifier = Modifier.size(16.dp))
+                    },
+                    label = {
+                        Text(
+                            text = "Zurücksetzen",
+                            style = MaterialTheme.typography.labelMedium
+                        )
+                    },
+                    colors = FilterChipDefaults.filterChipColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                        labelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        iconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        selectedContainerColor = MaterialTheme.colorScheme.secondaryContainer,
+                        selectedLabelColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                        selectedLeadingIconColor = MaterialTheme.colorScheme.onSecondaryContainer
+                    )
+                )
+            }
         }
     }
 }

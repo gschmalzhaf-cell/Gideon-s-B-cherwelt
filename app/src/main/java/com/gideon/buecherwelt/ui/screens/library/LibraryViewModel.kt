@@ -56,25 +56,42 @@ data class LibraryUiState(
     val readingBooks: List<Book>
         get() = books.filter { it.status == ReadingStatus.READING }
 
+    val hasActiveFilters: Boolean
+        get() = query.isNotBlank() ||
+            genre != null ||
+            status != null ||
+            minRating > 0 ||
+            trope != null ||
+            series != null ||
+            universe != null ||
+            semanticActive
+
     val filtered: List<Book>
         get() {
             val ids = if (semanticActive) semanticIds else null
-            val q = query.trim()
-            val qIsbn = isbnComparable(q)
+            // Mehrere Suchbegriffe (per Leerzeichen getrennt) werden UND-verknüpft:
+            // jeder Begriff muss in mindestens einem Feld des Buchs vorkommen.
+            val terms = query.trim().split(Regex("\\s+")).filter { it.isNotBlank() }
+            val qIsbnAll = isbnComparable(query)
             val matched = books.filter { book ->
-                val matchesQuery = q.isBlank() ||
-                    book.title.contains(q, ignoreCase = true) ||
-                    book.subtitle.contains(q, ignoreCase = true) ||
-                    book.author.contains(q, ignoreCase = true) ||
-                    book.seriesName.contains(q, ignoreCase = true) ||
-                    book.universeName.contains(q, ignoreCase = true) ||
-                    book.genre.contains(q, ignoreCase = true) ||
-                    book.subgenre.contains(q, ignoreCase = true) ||
-                    book.publisher.contains(q, ignoreCase = true) ||
-                    book.notes.contains(q, ignoreCase = true) ||
-                    book.description.contains(q, ignoreCase = true) ||
-                    book.tropes.any { it.name.contains(q, ignoreCase = true) } ||
-                    (qIsbn.isNotEmpty() && isbnComparable(book.isbn ?: "").contains(qIsbn))
+                val bookIsbn = isbnComparable(book.isbn ?: "")
+                val matchesQuery = terms.isEmpty() ||
+                    (qIsbnAll.length >= 10 && bookIsbn.contains(qIsbnAll)) ||
+                    terms.all { term ->
+                        val termIsbn = isbnComparable(term)
+                        book.title.contains(term, ignoreCase = true) ||
+                            book.subtitle.contains(term, ignoreCase = true) ||
+                            book.author.contains(term, ignoreCase = true) ||
+                            book.seriesName.contains(term, ignoreCase = true) ||
+                            book.universeName.contains(term, ignoreCase = true) ||
+                            book.genre.contains(term, ignoreCase = true) ||
+                            book.subgenre.contains(term, ignoreCase = true) ||
+                            book.publisher.contains(term, ignoreCase = true) ||
+                            book.notes.contains(term, ignoreCase = true) ||
+                            book.description.contains(term, ignoreCase = true) ||
+                            book.tropes.any { it.name.contains(term, ignoreCase = true) } ||
+                            (termIsbn.length >= 4 && bookIsbn.contains(termIsbn))
+                    }
 
                 (ids == null || book.id in ids) &&
                     matchesQuery &&
@@ -185,6 +202,24 @@ class LibraryViewModel(
     fun setSeries(series: String?) = _state.update { it.copy(series = series) }
     fun setUniverse(universe: String?) = _state.update { it.copy(universe = universe) }
     fun setSortOrder(order: LibrarySortOrder) = _state.update { it.copy(sortOrder = order) }
+
+    fun resetFilters() = _state.update {
+        it.copy(
+            query = "",
+            genre = null,
+            status = null,
+            minRating = 0,
+            trope = null,
+            series = null,
+            universe = null,
+            sortOrder = LibrarySortOrder.RECENT
+        )
+    }
+
+    fun resetAllIncludingSemantic() {
+        resetFilters()
+        clearSemantic()
+    }
 
     fun setSemanticQuery(query: String) = _state.update { it.copy(semanticQuery = query) }
 

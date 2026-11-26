@@ -127,6 +127,13 @@ object SmartLibraryEngine {
             else -> null
         }
 
+        // 2b. „Unbewertet“-Intent (Bücher ohne Sterne-Bewertung)
+        var onlyUnrated = false
+        if (listOf("unbewertet", "ohne bewertung", "nicht bewertet", "noch nicht bewertet").any { lower.contains(it) }) {
+            onlyUnrated = true
+            hints += "Ohne Bewertung"
+        }
+
         // 3. Spice-Intents
         var minSpice: Int? = null
         var maxSpice: Int? = null
@@ -188,6 +195,7 @@ object SmartLibraryEngine {
             // Harte Filter prüfen (Status, Rating)
             if (statusFilter != null && book.status != statusFilter) return@mapNotNull null
             if (minRating != null && (book.rating ?: 0) < minRating) return@mapNotNull null
+            if (onlyUnrated && book.rating != null) return@mapNotNull null
 
             val chars = ReadingStatsCalculator.analyzeBookCharacteristics(book)
             val effectiveSpice = book.spiceLevel ?: 0
@@ -230,7 +238,7 @@ object SmartLibraryEngine {
 
             // Bonus wenn reine Intent-Suche (z.B. "ungelesen", "kurz", "5 sterne", "nächstes highlight")
             val hasHardIntent = statusFilter != null || minRating != null || minSpice != null ||
-                maxSpice != null || maxPages != null || minPages != null || highlightIntent
+                maxSpice != null || maxPages != null || minPages != null || highlightIntent || onlyUnrated
             if (hasHardIntent) {
                 val fit = book.aiFitScore ?: ReadingStatsCalculator.computeLocalFit(book, profile, books).first
                 score += if (highlightIntent) fit else (fit / 4)

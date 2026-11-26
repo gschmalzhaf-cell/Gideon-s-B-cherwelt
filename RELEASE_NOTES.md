@@ -1,3 +1,20 @@
+## Gideon's Bücherwelt v1.7.3 – Bibliothek: Intelligentere Suche & intuitiveres Filtern
+
+### 🔎 Mehr-Begriff-Suche (UND-Verknüpfung)
+- Die normale Suche im Bibliothek-Reiter versteht jetzt **mehrere Begriffe** (per Leerzeichen getrennt, z. B. `sanderson stormlight`): Ein Buch erscheint nur, wenn **jeder** Begriff in Titel, Autor:in, Reihe, Universum, Genre, Trope, Notizen, Beschreibung oder ISBN vorkommt. ISBN-Suche funktioniert weiterhin – auch pro Begriff und als komplette ISBN mit Leerzeichen.
+
+### ↩️ Filter schneller zurücksetzen
+- Sobald Suche oder ein Filter aktiv ist, erscheint in der Filter-Leiste ein **„Zurücksetzen“-Chip** – ein Tipp genügt, um Suche, alle Filter und die Sortierung zurückzusetzen.
+- Auch im „Keine Bücher gefunden“-Hinweis gibt es jetzt einen Button **„Suche & Filter zurücksetzen“** (setzt zusätzlich eine aktive Smart-Suche zurück).
+
+### ⌨️ Smart-Suche per Tastatur starten
+- Im Smart-&-KI-Suchfeld startet die **Suchtaste (IME „Suchen“)** der Tastatur die Suche direkt – der Griff zum Lupen-Button ist optional.
+
+### 🧠 Neuer Smart-Suche-Intent „unbewertet“
+- Fragen wie „unbewertet“, „ohne Bewertung“ oder „noch nicht bewertet“ finden jetzt gezielt Bücher **ohne Sterne-Bewertung** – inkl. neuem Preset-Chip „❓ Unbewertet“.
+
+---
+
 ## Gideon's Bücherwelt v1.7.2 – Bibliothek: Suchfelder scrollen mit dem Regal
 
 ### ✨ Verbesserung

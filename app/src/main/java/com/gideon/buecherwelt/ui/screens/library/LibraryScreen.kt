@@ -16,6 +16,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -29,6 +31,7 @@ import androidx.compose.material.icons.filled.AutoStories
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.RestartAlt
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -39,6 +42,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -49,6 +53,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -196,7 +201,8 @@ fun LibraryScreen(
                         selectedUniverse = state.universe,
                         onUniverseChange = viewModel::setUniverse,
                         sortOrder = state.sortOrder,
-                        onSortOrderChange = viewModel::setSortOrder
+                        onSortOrderChange = viewModel::setSortOrder,
+                        onResetAll = viewModel::resetFilters
                     )
                     if (state.enriching || state.enrichMessage != null) {
                         Surface(
@@ -274,6 +280,8 @@ fun LibraryScreen(
                                     }
                                 } else null,
                                 singleLine = true,
+                                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                                keyboardActions = KeyboardActions(onSearch = { viewModel.runSemanticSearch() }),
                                 modifier = Modifier.weight(1f)
                             )
                             Spacer(modifier = Modifier.width(8.dp))
@@ -294,7 +302,8 @@ fun LibraryScreen(
                             "🔥 Spicy" to "spicy",
                             "☕ Cozy & Kurz" to "warmherzig kurz",
                             "🐉 Magisch" to "magisch",
-                            "⭐ Favoriten" to "favoriten"
+                            "⭐ Favoriten" to "favoriten",
+                            "❓ Unbewertet" to "unbewertet"
                         )
                         LazyRow(
                             horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -342,7 +351,20 @@ fun LibraryScreen(
                             "Deine Regale warten auf ihr erstes Werk. Füge Bücher per ISBN-Scan, Cover-Foto oder manuell über das + hinzu."
                         } else {
                             "Kein Buch entspricht den gewählten Filtern."
-                        }
+                        },
+                        action = if (state.hasActiveFilters) {
+                            {
+                                OutlinedButton(onClick = { viewModel.resetAllIncludingSemantic() }) {
+                                    Icon(
+                                        Icons.Default.RestartAlt,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("Suche & Filter zurücksetzen")
+                                }
+                            }
+                        } else null
                     )
                 }
             } else {
