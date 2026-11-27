@@ -8,6 +8,7 @@ import com.gideon.buecherwelt.data.network.BookMetadataFetcher
 import com.gideon.buecherwelt.data.network.CoverCache
 import com.gideon.buecherwelt.data.network.GoogleBooksApi
 import com.gideon.buecherwelt.data.network.OpenLibraryApi
+import com.gideon.buecherwelt.data.network.WebBookResearch
 import com.gideon.buecherwelt.data.settings.SettingsRepository
 import com.gideon.buecherwelt.domain.llm.CoverIdentifier
 import com.gideon.buecherwelt.domain.llm.LlmClient
@@ -81,7 +82,8 @@ class AppContainer(context: Context) {
 
     val llmClient = LlmClient(okHttpClient, json)
     val llmService = LlmService(llmClient, tropeRepository)
-    val coverIdentifier = CoverIdentifier(appContext, llmClient, metadataFetcher)
+    val webBookResearch = WebBookResearch(okHttpClient)
+    val coverIdentifier = CoverIdentifier(appContext, llmClient, metadataFetcher, webBookResearch)
     val recommendationEngine = RecommendationEngine(metadataFetcher)
     val addToLibrary = AddToLibraryUseCase(bookRepository, tropeRepository, metadataFetcher, coverCache)
     val bookEnrichmentService = com.gideon.buecherwelt.domain.usecase.BookEnrichmentService(

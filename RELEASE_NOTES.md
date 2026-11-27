@@ -1,3 +1,11 @@
+## Gideon's Bücherwelt v1.7.4 – Cover-Scan mit Internet-Recherche als Fallback
+
+### 🌐 Neu: Websuche, wenn das Cover nicht erkannt wird
+- Wird ein Buch beim Cover-Scan weder per **KI (LLM)** noch per **OCR + Katalog** (Google Books / Open Library / DNB) gefunden, startet die App automatisch eine **Internet-Recherche**: Die auf dem Cover erkannten Texte werden über die offene Websuche (DuckDuckGo/Bing, ohne API-Key) gesucht und die Top-Treffer – z. B. **Autor:innen-Seite, Verlag oder Buchhandlung** – werden analysiert. Titel, Autor:in, ISBN, Cover und Erscheinungsjahr werden aus den Seiten-Metadaten übernommen und anschließend gegen die Kataloge aufgelöst. Jedes Buch ist irgendwo auffindbar.
+- Im Dialog „Cover scannen“ wird der Ablauf erklärt, und während der Erkennung zeigt die App den aktuellen Schritt an (KI-Analyse → OCR → Kataloge → Internet-Recherche).
+
+---
+
 ## Gideon's Bücherwelt v1.7.3 – Bibliothek: Intelligentere Suche & intuitiveres Filtern
 
 ### 🔎 Mehr-Begriff-Suche (UND-Verknüpfung)

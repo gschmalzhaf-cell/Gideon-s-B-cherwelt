@@ -454,20 +454,30 @@ class AddBookViewModel(
 
     fun onCoverImage(path: String) {
         viewModelScope.launch {
-            _state.update { it.copy(loading = true, error = null, suggestions = null) }
-            when (val result = coverIdentifier.identify(path, llmConfig)) {
+            _state.update {
+                it.copy(
+                    loading = true,
+                    error = null,
+                    suggestions = null,
+                    statusInfo = "Cover wird analysiert…"
+                )
+            }
+            when (val result = coverIdentifier.identify(path, llmConfig) { phase ->
+                _state.update { it.copy(statusInfo = phase) }
+            }) {
                 is FetchResult.Success -> applyMetadata(result.metadata, result.metadata.isbn)
                 is FetchResult.NotFound -> _state.update {
                     it.copy(
                         loading = false,
-                        error = "Buch auf dem Cover nicht erkannt (LLM/OCR + Google Books/Open Library/DNB). Bitte manuell ausfüllen."
+                        statusInfo = null,
+                        error = "Buch auf dem Cover nicht erkannt (KI/OCR + Kataloge + Websuche). Bitte manuell ausfüllen."
                     )
                 }
                 is FetchResult.NoNetwork -> _state.update {
-                    it.copy(loading = false, error = "Keine Netzwerkverbindung. Manuelle Erfassung ist trotzdem möglich.")
+                    it.copy(loading = false, statusInfo = null, error = "Keine Netzwerkverbindung. Manuelle Erfassung ist trotzdem möglich.")
                 }
                 is FetchResult.Error -> _state.update {
-                    it.copy(loading = false, error = result.message)
+                    it.copy(loading = false, statusInfo = null, error = result.message)
                 }
             }
         }
@@ -504,6 +514,7 @@ class AddBookViewModel(
         _state.update {
             it.copy(
                 loading = false,
+                statusInfo = null,
                 suggestions = if (
                     localSuggestions.tropes.isNotEmpty() ||
                     localSuggestions.genres.isNotEmpty() ||

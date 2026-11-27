@@ -819,8 +819,10 @@ fun AddBookScreen(
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
                         "Foto aufnehmen oder aus der Galerie wählen. Die App erkennt das Buch " +
-                            "per LLM (falls in den Einstellungen konfiguriert) oder Texterkennung (OCR) " +
-                            "und lädt die Metadaten über Google Books / Open Library / DNB."
+                            "per KI (falls in den Einstellungen konfiguriert) oder Texterkennung (OCR), " +
+                            "sucht in Google Books / Open Library / DNB – und startet notfalls eine " +
+                            "Internet-Recherche (z. B. Autor:innen-Seite oder Verlag), damit das Buch " +
+                            "trotzdem gefunden wird."
                     )
                     TextButton(onClick = {
                         showCoverDialog = false

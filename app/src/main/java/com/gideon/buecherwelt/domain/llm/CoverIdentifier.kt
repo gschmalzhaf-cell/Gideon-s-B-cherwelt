@@ -7,6 +7,7 @@ import android.net.Uri
 import android.util.Base64
 import com.gideon.buecherwelt.data.network.BookMetadataFetcher
 import com.gideon.buecherwelt.data.network.FetchResult
+import com.gideon.buecherwelt.data.network.WebBookResearch
 import com.gideon.buecherwelt.data.settings.LlmConfig
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.TextRecognition
@@ -32,38 +33,86 @@ data class CoverIdentification(
 class CoverIdentifier(
     private val context: Context,
     private val llmClient: LlmClient,
-    private val fetcher: BookMetadataFetcher
+    private val fetcher: BookMetadataFetcher,
+    private val webResearch: WebBookResearch
 ) {
 
-    suspend fun identify(imagePath: String, llmConfig: LlmConfig): FetchResult =
-        withContext(Dispatchers.IO) {
-            if (llmConfig.isConfigured) {
-                val b64 = imageToBase64Jpeg(imagePath, maxSize = 1024)
-                if (b64 != null) {
-                    val raw = llmClient.completeVision(
-                        llmConfig,
-                        "Du bist ein Bibliotheks-Assistent. Erkenne das Buch auf dem Cover-Foto. " +
-                            "Antworte ausschließlich als JSON-Objekt mit den Feldern " +
-                            "\"title\", \"author\", \"isbn\" (falls lesbar, sonst null), \"publisher\", \"year\" (4-stellig, falls erkennbar).",
-                        "Welches Buch ist auf diesem Cover abgebildet? Gib title, author, isbn (falls sichtbar), publisher und year als JSON zurück.",
-                        b64
-                    )
-                    val parsed = raw?.let { parseCoverJson(it) }
-                    if (parsed != null && parsed.title.isNotBlank()) {
-                        val isbn = parsed.isbn?.let { BookMetadataFetcher.normalizeIsbn(it) }
-                        if (isbn != null) {
-                            val byIsbn = fetcher.fetchByIdentifier(isbn)
-                            if (byIsbn is FetchResult.Success) return@withContext byIsbn
+    suspend fun identify(
+        imagePath: String,
+        llmConfig: LlmConfig,
+        onPhase: (String) -> Unit = {}
+    ): FetchResult = withContext(Dispatchers.IO) {
+        var sawNoNetwork = false
+        var llmParsed: CoverIdentification? = null
+
+        if (llmConfig.isConfigured) {
+            onPhase("Cover wird per KI analysiert…")
+            val b64 = imageToBase64Jpeg(imagePath, maxSize = 1024)
+            if (b64 != null) {
+                val raw = llmClient.completeVision(
+                    llmConfig,
+                    "Du bist ein Bibliotheks-Assistent. Erkenne das Buch auf dem Cover-Foto. " +
+                        "Antworte ausschließlich als JSON-Objekt mit den Feldern " +
+                        "\"title\", \"author\", \"isbn\" (falls lesbar, sonst null), \"publisher\", \"year\" (4-stellig, falls erkennbar).",
+                    "Welches Buch ist auf diesem Cover abgebildet? Gib title, author, isbn (falls sichtbar), publisher und year als JSON zurück.",
+                    b64
+                )
+                val parsed = raw?.let { parseCoverJson(it) }
+                if (parsed != null && parsed.title.isNotBlank()) {
+                    llmParsed = parsed
+                    val isbn = parsed.isbn?.let { BookMetadataFetcher.normalizeIsbn(it) }
+                    if (isbn != null) {
+                        onPhase("Kataloge durchsuchen (ISBN)…")
+                        when (val byIsbn = fetcher.fetchByIdentifier(isbn)) {
+                            is FetchResult.Success -> return@withContext byIsbn
+                            is FetchResult.NoNetwork -> sawNoNetwork = true
+                            else -> {}
                         }
-                        return@withContext fetcher.findByTitleAuthor(parsed.title, parsed.author)
+                    }
+                    onPhase("Kataloge durchsuchen (Titel & Autor)…")
+                    when (val byTitle = fetcher.findByTitleAuthor(parsed.title, parsed.author)) {
+                        is FetchResult.Success -> return@withContext byTitle
+                        is FetchResult.NoNetwork -> sawNoNetwork = true
+                        else -> {}
                     }
                 }
             }
-            val lines = ocrLines(imagePath)
-            val (title, author) = guessTitleAuthor(lines)
-            if (title != null) return@withContext fetcher.findByTitleAuthor(title, author ?: "")
-            FetchResult.NotFound
         }
+
+        onPhase("Cover-Text per OCR lesen…")
+        val lines = ocrLines(imagePath)
+        val (title, author) = guessTitleAuthor(lines)
+        if (title != null) {
+            onPhase("Kataloge durchsuchen (Google Books, Open Library, DNB)…")
+            when (val r = fetcher.findByTitleAuthor(title, author ?: "")) {
+                is FetchResult.Success -> return@withContext r
+                is FetchResult.NoNetwork -> sawNoNetwork = true
+                else -> {}
+            }
+        }
+
+        // Internet-Recherche: offenes Web nach dem Cover-Text durchsuchen
+        // (z. B. Autor:innen-Seite, Verlag, Buchhandlung) – jedes Buch ist irgendwo auffindbar.
+        onPhase("Internet-Recherche läuft (Websuche nach dem Cover)…")
+        val web = webResearch.research(lines, llmParsed?.title, llmParsed?.author)
+        if (web != null && web.title.isNotBlank()) {
+            val isbn = web.isbn?.let { BookMetadataFetcher.normalizeIsbn(it) }
+            if (isbn != null) {
+                when (val byIsbn = fetcher.fetchByIdentifier(isbn)) {
+                    is FetchResult.Success -> return@withContext byIsbn
+                    is FetchResult.NoNetwork -> sawNoNetwork = true
+                    else -> {}
+                }
+            }
+            when (val byTitle = fetcher.findByTitleAuthor(web.title, web.author)) {
+                is FetchResult.Success -> return@withContext byTitle
+                is FetchResult.NoNetwork -> sawNoNetwork = true
+                else -> return@withContext FetchResult.Success(web)
+            }
+        }
+
+        if (sawNoNetwork) FetchResult.NoNetwork else FetchResult.NotFound
+    }
 
     private val json = Json { ignoreUnknownKeys = true }
 
